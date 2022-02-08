@@ -1,7 +1,10 @@
 ;; memory is 256 cells, cell[0] is NIL, cell[<0]->List, cell[>0]->Atom
-(defparameter *memory* (make-array 256))
+(defparameter *memory* nil)
 (defconstant +min-address+ -127)
 (defconstant +max-address+ +128)
+
+(defun memsize ()
+  (1+ (+ (abs +max-address+) (abs +min-address+))))
 
 (defconstant +cell-size+ 2) ;; each cell is 2 units long (in Sector Lisp, unit=byte)
 
@@ -15,26 +18,50 @@
   (let ((ix (@adjust-index index)))
     (@fetch ix)))
 
-(defun @put (index vcar vcdr)
+(defun @put (index v)
   (let ((ix (@adjust-index index)))
-    (setf (aref *memory* ix) vcar)
-    (setf (aref *memory* (1+ ix)) vcdr)
-    index))
+    (setf (aref *memory* ix) v))
+    index)
 
-(defparameter *next-free-list-cell* -1)
-(defparameter *next-free-atom* 0)
+(defparameter *next-free-list-pointer* -1)
+(defparameter *next-free-atom-pointer* 0)
+
 
 (defconstant kNil 0)
 (defconstant @NIL kNil)
 
+(defun @putatombyte (v)
+  (@put *next-free-atom-pointer* v)
+  (incf *next-free-atom-pointer*))
+  
+(defun @putatomcell (vcar vcdr)
+  (let ((index *next-free-atom-pointer*))
+    (@putatombyte vcar)
+    (@putatombyte vcdr)
+    index))
+
+(defun bumplist ()
+  (decf *next-free-list-pointer*))
+
+(defun @putlistcell (vcar vcdr)
+    (@put *next-free-list-pointer* vcdr)
+    (bumplist)
+    (let ((index *next-free-list-pointer*))
+      (@put *next-free-list-pointer* vcar)
+      (bumplist)
+      index))
+
+
 (defun @putatom (chars)
   (if (null chars)
       0
-    (let ((atom-index *next-free-atom*))
-      (let ((next-atom-index (+ +cell-size+ atom-index)))
-	(@put atom-index (car chars) next-atom-index)
-	(setf *next-free-atom* next-atom-index)
-	atom-index))))
+    (let ((atom-index *next-free-atom-pointer*))
+      (@putatombyte (car chars))
+      (let ((cdr-address *next-free-atom-pointer*))
+        (incf *next-free-atom-pointer*)
+        (let ((vcdr (@putatom (cdr chars))))
+          (@put cdr-address vcdr)
+          atom-index)))))
 
 
 ;; in C, these would be top-level #defines (using human-calculated offsets)
@@ -60,12 +87,14 @@
 (defparameter kCdr   -1)
 
 (defun initialize-memory ()
-  (setf *next-free-list-cell* -1)
-  (setf *next-free-atom* 0)
+  (setf *memory* (make-array (memsize) :initial-element @NIL))
+  (setf *next-free-list-pointer* -1)
+  (setf *next-free-atom-pointer* 0)
   (let ((i +min-address+))
     (loop 
      (when (< i +max-address+) (return)) ;; break from loop
-     (@put i 0 0)
+     (@put *next-free-atom-pointer* 0)
+     (@put *next-free-atom-pointer* 0)
      (incf i)))
   (assert ( = @NIL (@putatom '(#\N #\I #\L))))
   (setf kQuote (@putatom '(#\Q #\U #\O #\T #\E)))
@@ -81,9 +110,7 @@
 ;;;;;;;;;;;;; basic functions
 
 (defun @cons (vcar vcdr)
-  (let ((index *next-free-list-cell*))
-    (decf *next-free-list-cell*)
-    (@put index vcar vcdr)))
+  (@putlistcell vcar vcdr))
 
 (defun @car (index)
   (@get index))
@@ -98,7 +125,7 @@
 
 ;; evaluator
 (defun @eval (e env)
-  (let ((previous-SP *next-free-list-cell*))
+  (let ((previous-SP *next-free-list-pointer*))
     (cond
       ((= e 0) 0)
       ((eq (@car e) kQuote) (@car (@cdr e)))
@@ -213,11 +240,11 @@
     index))
 
 (defun @gc (A index)
-  (let ((B *next-free-list-cell*))
+  (let ((B *next-free-list-pointer*))
     (let ((copied-cell-index (@copy index A (- A B))))
-      (let ((C *next-free-list-cell*)) ;; updated by above line
+      (let ((C *next-free-list-pointer*)) ;; updated by above line
         (@move A B C)
-        (setf *next-free-list-cell* A)
+        (setf *next-free-list-pointer* A)
         copied-cell-index))))
 
 (defun @move (A B C)
@@ -227,7 +254,8 @@
    (decf B)
    (let ((B-car (@car B))
          (B-cdr (@cdr B)))
-     (@put A B-car B-cdr))))
+     (@put A B-car)
+     (@put (1+ A) B-cdr))))
 
 ;;;;
 
@@ -235,6 +263,6 @@
   (initialize-memory)
   ;; (quote A)
   (let ((index-A (@putatom '(#\A))))
-    (let ((list-to-be-interpreted (@cons kQuote index-A)))
+    (let ((list-to-be-interpreted (@cons kQuote (@cons index-A @NIL))))
       (let ((result (@eval list-to-be-interpreted @NIL)))
 	(format *standard-output* "~a~%" result)))))
