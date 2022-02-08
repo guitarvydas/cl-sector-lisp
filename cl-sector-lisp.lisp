@@ -1,26 +1,25 @@
 ;; memory is 256 cells, cell[0] is NIL, cell[<0]->List, cell[>0]->Atom
-(defparameter *memory* nil)
-
-(defstruct cell
-  car
-  cdr)
+(defparameter *memory* (make-array 256))
+(defconstant +min-address+ -127)
+(defconstant +max-address+ +128)
 
 (defconstant +cell-size+ 2) ;; each cell is 2 units long (in Sector Lisp, unit=byte)
 
-(defun @adjust-index (i) (+ 256 i))
+(defun @adjust-index (i) (+ 128 i))
+(defun @unadjust-index (i) (- i 128))
 
-(defun @fetch-cell (adjusted-index)
-  (nth adjusted-index *memory*)) ;; could be implemented with AREF
+(defun @fetch (ix)
+  (aref *memory* ix))
 
 (defun @get (index)
   (let ((ix (@adjust-index index)))
-    (@fetch-cell ix)))
+    (@fetch ix)))
 
 (defun @put (index vcar vcdr)
   (let ((ix (@adjust-index index)))
-    (let ((cell (@fetch-cell ix)))
-      (setf (cell-car cell) vcar)
-      (setf (cell-cdr cell) vcdr))))
+    (setf (aref *memory* ix) vcar)
+    (setf (aref *memory* (1+ ix)) vcdr)
+    index))
 
 (defparameter *next-free-list-cell* -1)
 (defparameter *next-free-atom* 0)
@@ -61,9 +60,11 @@
 (defparameter kCdr   -1)
 
 (defun initialize-memory ()
-  (let ((i 0))
+  (setf *next-free-list-cell* -1)
+  (setf *next-free-atom* 0)
+  (let ((i +min-address+))
     (loop 
-     (when (< i 256) (return)) ;; break from loop
+     (when (< i +max-address+) (return)) ;; break from loop
      (@put i 0 0)
      (incf i)))
   (assert ( = @NIL (@putatom '(#\N #\I #\L))))
@@ -85,10 +86,10 @@
     (@put index vcar vcdr)))
 
 (defun @car (index)
-  (cell-car (@get index)))
+  (@get index))
 
 (defun @cdr (index)
-  (cell-cdr (@get index)))
+  (@get (1+ index)))
 
 
 (defun @eq (index-A index-B)
