@@ -1,31 +1,26 @@
 ;; memory is 256 cells, cell[0] is NIL, cell[<0]->List, cell[>0]->Atom
 (defparameter *memory* nil)
 
-(defstruct @
-  (car cdr))
+(defstruct cell
+  car
+  cdr)
 
 (defconstant +cell-size+ 2) ;; each cell is 2 units long (in Sector Lisp, unit=byte)
 
 (defun @adjust-index (i) (+ 256 i))
 
 (defun @fetch-cell (adjusted-index)
-  (nth *memory* adjusted-index)) ;; could be implemented with AREF
+  (nth adjusted-index *memory*)) ;; could be implemented with AREF
 
 (defun @get (index)
-  (let ((ix (@adjust-index i)))
+  (let ((ix (@adjust-index index)))
     (@fetch-cell ix)))
 
 (defun @put (index vcar vcdr)
   (let ((ix (@adjust-index index)))
     (let ((cell (@fetch-cell ix)))
-      (setf (@car cell) vcar)
-      (setf (@cdr cell) vcdr))))
-
-;; initialize memory
-(let ((i 0))
-  (loop while (< i 256)
-	do (@put i 0 0)
-	do (incf i)))
+      (setf (cell-car cell) vcar)
+      (setf (cell-cdr cell) vcdr))))
 
 (defparameter *next-free-list-cell* -1)
 (defparameter *next-free-atom* 0)
@@ -34,22 +29,52 @@
 (defconstant @NIL kNil)
 
 (defun @putatom (chars)
-  (when chars
+  (if (null chars)
+      0
     (let ((atom-index *next-free-atom*))
       (let ((next-atom-index (+ +cell-size+ atom-index)))
 	(@put atom-index (car chars) next-atom-index)
 	(setf *next-free-atom* next-atom-index)
 	atom-index))))
-  
-(@putatom '(#\N #\I #\L))
 
-(defconstant kQuote (@putatom '(#\Q #\U #\O #\T #\E)))
-(defconstant kCond  (@putatom '(#\C #\O #\N #\D    )))
-(defconstant kEq    (@putatom '(#\E #\Q            )))
-(defconstant kCons  (@putatom '(#\C #\O #\N #\S    )))
-(defconstant kAtom  (@putatom '(#\A #\T #\O #\M    )))
-(defconstant kCar   (@putatom '(#\C #\A #\R        )))
-(defconstant kCdr   (@putatom '(#\C #\D #\R        )))
+
+;; in C, these would be top-level #defines (using human-calculated offsets)
+;; in assembler, we could use assembler directives to calculate the offsets,
+;; but, we want to call Lisp functions to calculate these indices
+;;  (i.e. we want Lisp to be the assembler app AND the programming language,
+;;   i.e. we could use Lisp to be all languages to all people (assembler and HLL))
+;; we *could* do this with the appropriate application of eval-when, but
+;;  I'm feeling lazy, so, instead I will make these constants into parameters
+;; (N.B. defparameter causes these items to be "special"s - dynamically bound,
+;;  so, if we cared about optimizing this code, we would cause these items to
+;;  be compile-time constants, or we would bind them in a LET (static binding),
+;;  but we'd have to make sure that all code referring to these constants would
+;;  also be included in the LET (Lisp, in fact would help us do this, but, I'm
+;;  more interested in writing code for Humans than for Lisp).
+
+(defparameter kQuote -1)
+(defparameter kCond  -1)
+(defparameter kEq    -1)
+(defparameter kCons  -1)
+(defparameter kAtom  -1)
+(defparameter kCar   -1)
+(defparameter kCdr   -1)
+
+(defun initialize-memory ()
+  (let ((i 0))
+    (loop 
+     (when (< i 256) (return)) ;; break from loop
+     (@put i 0 0)
+     (incf i)))
+  (assert ( = @NIL (@putatom '(#\N #\I #\L))))
+  (setf kQuote (@putatom '(#\Q #\U #\O #\T #\E)))
+  (setf kCond  (@putatom '(#\C #\O #\N #\D    )))
+  (setf kEq    (@putatom '(#\E #\Q            )))
+  (setf kCons  (@putatom '(#\C #\O #\N #\S    )))
+  (setf kAtom  (@putatom '(#\A #\T #\O #\M    )))
+  (setf kCar   (@putatom '(#\C #\A #\R        )))
+  (setf kCdr   (@putatom '(#\C #\D #\R        ))))
+
 
   
 ;;;;;;;;;;;;; basic functions
@@ -57,13 +82,13 @@
 (defun @cons (vcar vcdr)
   (let ((index *next-free-list-cell*))
     (decf *next-free-list-cell*)
-    (putcell (index vcar vdr))))
+    (@put index vcar vcdr)))
 
 (defun @car (index)
-  (@car (@get index)))
+  (cell-car (@get index)))
 
 (defun @cdr (index)
-  (@cdr (@get index)))
+  (cell-cdr (@get index)))
 
 
 (defun @eq (index-A index-B)
@@ -72,21 +97,21 @@
 
 ;; evaluator
 (defun @eval (e env)
-  (let ((previous-SP *next-free-cell*))
+  (let ((previous-SP *next-free-list-cell*))
     (cond
       ((= e 0) 0)
       ((eq (@car e) kQuote) (@car (@cdr e)))
       ((eq (@cdr e) kCond) (@evcon (@cdr e) env))
       ((> e 0) (@assoc e env))
-      (t (let ((v (@apply (@car e) (@evlis e) env)))
-	   (@gc previous-SP v env))))))
+      (t (let ((v (@apply (@car e) (@evlis e env) env)))
+	   (@gc previous-SP v))))))
 
 (defun @apply (f args env)
   ;; apply function f to a *list* of values (args) in given environment
   (cond
 
     ((< f 0) 
-     (let ((new-env (@pailis args env))) 
+     (let ((new-env (@pairlis args env))) 
        (@eval (@car (@cdr (@cdr f)) new-env))))
 
     ((eq f kEQ) 
@@ -150,8 +175,8 @@
     (t
      (let ((first-expr (@car expr-list))
 	   (rest-of-exprs (@cdr expr-list)))
-       (let ((first-value ((@eval first-expr env))))
-	 (@cons first-value (@evlis rest-of-exprs env))))
+       (let ((first-value (@eval first-expr env)))
+	 (@cons first-value (@evlis rest-of-exprs env)))))))
 
 (defun @evcon (list-to-be-interpreted-as-a-condition env)
   ;; interpret a list as a COND
@@ -171,7 +196,35 @@
 	      (t (@evcon rest-of-pairs env)))))))
 
 
+;;;; Garbage Collection
+(defun @copy (index m offset)
+  (if (< index m)
+      (let ((car-copy (@copy (@car index) m offset))
+            (cdr-copy (@copy (@cdr index) m offset)))
+        (@cons car-copy cdr-copy))
+    index))
+
+(defun @gc (A index)
+  (let ((B *next-free-list-cell*))
+    (let ((copied-cell-index (@copy index A (- A B))))
+      (let ((C *next-free-list-cell*)) ;; updated by above line
+        (@move A B C)
+        (setf *next-free-list-cell* A)
+        copied-cell-index))))
+
+(defun @move (A B C)
+  (loop
+   (when (< C B) (return))
+   (decf A)
+   (decf B)
+   (let ((B-car (@car B))
+         (B-cdr (@cdr B)))
+     (@put A B-car B-cdr))))
+
+;;;;
+
 (defun main ()
+  (initialize-memory)
   ;; (quote A)
   (let ((index-A (@putatom #\A @NIL)))
     (let ((list-to-be-interpreted (@cons kQuote index-A)))
