@@ -266,3 +266,12 @@
     (let ((list-to-be-interpreted (@cons kQuote (@cons index-A @NIL))))
       (let ((result (@eval list-to-be-interpreted @NIL)))
 	(format *standard-output* "~a~%" result)))))
+
+(defun main1 ()
+  (initialize-memory)
+  ;; (quote A)
+  (let ((index-G (@putatom '(#\G)))
+        (index-H (@putatom '(#\H))))
+    (let ((list-to-be-interpreted (@cons index-G (@cons index-H @NIL))))
+      (let ((result (@eval list-to-be-interpreted @NIL)))
+	(format *standard-output* "~a~%" result)))))
