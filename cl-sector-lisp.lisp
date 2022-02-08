@@ -258,8 +258,17 @@
      (@put (1+ A) B-cdr))))
 
 ;;;;
+(defun list-cells ()
+  (let ((i (1+ *next-free-list-pointer*))
+        (stop @NIL)
+        (result nil))
+    (loop
+     (when (>= i stop) (return))
+     (push (@get i) result)
+     (incf i))
+    (reverse result)))
 
-(defun main ()
+(defun main0 ()
   (initialize-memory)
   ;; (quote A)
   (let ((index-A (@putatom '(#\A))))
@@ -267,11 +276,18 @@
       (let ((result (@eval list-to-be-interpreted @NIL)))
 	(format *standard-output* "~a~%" result)))))
 
-(defun main1 ()
+(defun main ()
   (initialize-memory)
   ;; (quote A)
   (let ((index-G (@putatom '(#\G)))
         (index-H (@putatom '(#\H))))
-    (let ((list-to-be-interpreted (@cons index-G (@cons index-H @NIL))))
-      (let ((result (@eval list-to-be-interpreted @NIL)))
-	(format *standard-output* "~a~%" result)))))
+
+    ;; (quote (G H))
+    (let ((listGH
+           (@cons
+                   (@cons index-G 
+                                (@cons index-H @NIL))
+                   @NIL)))
+      (let ((list-to-be-interpreted (@cons kQuote listGH)))
+        (let ((result (@eval list-to-be-interpreted @NIL)))
+          (format *standard-output* "LSP=~a~%memory: ~a~%list: ~a~%~a~%" *next-free-list-pointer* *memory* (list-cells) result))))))
