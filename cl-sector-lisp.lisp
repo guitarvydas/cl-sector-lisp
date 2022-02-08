@@ -111,8 +111,15 @@
   (cond
 
     ((< f 0) 
-     (let ((new-env (@pairlis args env))) 
-       (@eval (@car (@cdr (@cdr f)) new-env))))
+     ;; we have ((... f ...) (... exprs ...))
+     ;; f is a list with the shape (lambda (args ...) (body ...))
+     ;; the car of the cdr is (args ...)
+     ;; the car of the cddr is (body ...)
+     ;; the actual exprs that are to be bound to the args is args
+     (let ((arg-names (@car (@cdr f)))
+           (body (@car (@cdr (@cdr f)))))
+     (let ((new-env (@pairlis arg-names args env)))
+       (@eval body new-env))))
 
     ((eq f kEQ) 
      (let ((first-arg (@car args))
@@ -151,7 +158,7 @@
 	   (rest-of-names (@cdr arg-names))
 	   (rest-of-values (@cdr vals)))
        (let ((pairing (@cons first-name first-value)))
-	 (@cons pairing (@pairlis rest-of-names rest-of-values)))))       
+	 (@cons pairing (@pairlis rest-of-names rest-of-values env)))))       
 
     (t env)))
 
@@ -188,10 +195,10 @@
   (let ((first-pair (@car list-to-be-interpreted-as-a-condition))
 	(rest-of-pairs (@cdr list-to-be-interpreted-as-a-condition)))
     (let ((guard (@car first-pair)))
-      (let ((guard-value (@eval guard)))
+      (let ((guard-value (@eval guard env)))
 	(cond ((> guard-value 0)
 	       (let ((expr (@car first-pair)))
-		 (let ((expr-value (eval expr env)))
+		 (let ((expr-value (@eval expr env)))
 		   expr-value)))
 	      (t (@evcon rest-of-pairs env)))))))
 
@@ -226,7 +233,7 @@
 (defun main ()
   (initialize-memory)
   ;; (quote A)
-  (let ((index-A (@putatom #\A @NIL)))
+  (let ((index-A (@putatom '(#\A))))
     (let ((list-to-be-interpreted (@cons kQuote index-A)))
-      (let ((result (@eval list-to-be-interpreted)))
+      (let ((result (@eval list-to-be-interpreted @NIL)))
 	(format *standard-output* "~a~%" result)))))
