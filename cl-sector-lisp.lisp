@@ -355,7 +355,7 @@
       (let ((result (@eval list-to-be-interpreted @NIL)))
 	(format *standard-output* "~a~%" result)))))
 
-(defun main ()
+(defun main1 ()
   (initialize-memory)
   (let ((index-G (@putatom '(#\G)))
         (index-H (@putatom '(#\H))))
@@ -372,3 +372,28 @@
           (let ((result (@eval car-quote-listGH @NIL)))
             (@print result)
             (format *standard-output* "LSP=~a~%memory: ~a~%list: ~a~%~a~%" *mru-list-pointer* *memory* (list-cells) result)))))))
+
+(defun main ()
+  (initialize-memory)
+  (let ((index-G (@putatom '(#\G)))
+        (index-H (@putatom '(#\H)))
+        (index-I (@putatom '(#\I))))
+
+    ;; (G H)
+    (let ((listGH
+           (@cons index-G 
+                  (@cons index-H @NIL))))
+      (@print listGH)
+      (let ((quote-listGH (@cons kQuote (@cons listGH @NIL))))
+        (@print quote-listGH)
+        (let ((third (@cons kCdr (@cons quote-listGH @nil))))
+          (@print third)
+          (let ((quote-i-third (@cons
+                                (@cons kQuote (@cons index-I @NIL))
+                                (@cons third @NIL))))
+            (@print quote-i-third)
+            (let ((program (@cons kCons quote-i-third)))
+              (@print program)
+              (let ((result (@eval program @NIL)))
+                (@print result)
+                (format *standard-output* "LSP=~a~%memory: ~a~%list: ~a~%~a~%" *mru-list-pointer* *memory* (list-cells) result)))))))))
