@@ -30,6 +30,8 @@
 (defconstant kNil 0)
 (defconstant @NIL kNil)
 
+(defun @atomp (p) (>= p @NIL))
+
 (defun @putatombyte (v)
   (@put *next-free-atom-pointer* v)
   (incf *next-free-atom-pointer*))
@@ -54,7 +56,7 @@
 
 (defun @putatom (chars)
   (if (null chars)
-      0
+      @NIL
     (let ((atom-index *next-free-atom-pointer*))
       (@putatombyte (car chars))
       (let ((cdr-address *next-free-atom-pointer*))
@@ -125,54 +127,63 @@
 
 ;; evaluator
 (defun @eval (e env)
+  (@print-string "@eval")
+  (@print e)
+  (@print env)
   (let ((previous-SP *next-free-list-pointer*))
     (cond
-      ((= e 0) 0)
-      ((eq (@car e) kQuote) (@car (@cdr e)))
-      ((eq (@cdr e) kCond) (@evcon (@cdr e) env))
-      ((> e 0) (@assoc e env))
-      (t (let ((v (@apply (@car e) (@evlis e env) env)))
+      ((= e @NIL) @NIL)
+      ((> e @NIL) (@assoc e env))
+      ((@eq (@car e) kQuote) (@car (@cdr e)))
+      ((@eq (@cdr e) kCond) (@evcon (@cdr e) env))
+      (t (let ((v (@apply (@car e) (@evlis (@cdr e) env) env)))
 	   (@gc previous-SP v))))))
 
 (defun @apply (f args env)
+  (@print-string "@apply")
+  (@print f)
+  (@print args)
+  (@print env)
   ;; apply function f to a *list* of values (args) in given environment
   (cond
 
-    ((< f 0) 
+    ((< f @NIL) 
      ;; we have ((... f ...) (... exprs ...))
      ;; f is a list with the shape (lambda (args ...) (body ...))
      ;; the car of the cdr is (args ...)
      ;; the car of the cddr is (body ...)
      ;; the actual exprs that are to be bound to the args is args
-     (let ((arg-names (@car (@cdr f)))
-           (body (@car (@cdr (@cdr f)))))
-     (let ((new-env (@pairlis arg-names args env)))
-       (@eval body new-env))))
+     (let ((ignore-should-be-lambda (@car f))  ;; first
+	   (arg-names (@car (@cdr f)))         ;; second
+           (body      (@car (@cdr (@cdr f))))) ;; third
+       (declare (ignore ignore-should-be-lambda))
+       (let ((new-env (@pairlis arg-names args env)))
+	 (@eval body new-env))))
 
-    ((eq f kEQ) 
+    ((@eq f kEQ) 
      (let ((first-arg (@car args))
 	   (second-arg (@car (@cdr args))))
        (@eq first-arg second-arg)))
 
-    ((eq f kCons) 
+    ((@eq f kCons) 
      (let ((first-arg (@car args))
 	   (second-arg (@car (@cdr args))))
        (@cons first-arg second-arg)))
 
-    ((eq f kAtom) 
+    ((@eq f kAtom) 
      (let ((first-arg (@car args)))
-       (>= first-arg 0)))
+       (>= first-arg @NIL)))
 
-    ((eq f kCar) 
+    ((@eq f kCar) 
      (let ((first-arg (@car args)))
        (@car first-arg)))
 
-    ((eq f kCdr) 
+    ((@eq f kCdr) 
      (let ((first-arg (@car args)))
        (@cdr first-arg)))
 
     (t
-     (let ((anonymous-function (@assoc f env)))
+     (let ((anonymous-function (@assoc f env))) ;; find the value of f
        (@apply anonymous-function args env)))))
 
 
@@ -224,7 +235,7 @@
 	(rest-of-pairs (@cdr list-to-be-interpreted-as-a-condition)))
     (let ((guard (@car first-pair)))
       (let ((guard-value (@eval guard env)))
-	(cond ((> guard-value 0)
+	(cond ((> guard-value @NIL)
 	       (let ((expr (@car first-pair)))
 		 (let ((expr-value (@eval expr env)))
 		   expr-value)))
@@ -260,9 +271,11 @@
 ;;;;
 
 ;;;;; printing
+
+
 (defun @print (address)
   (let ((s (@stringify address)))
-    (format *standard-output* "~a~%" s)))
+    (@raw-print s)))
 
 (defun @stringify (address)
   (cond 
@@ -277,13 +290,25 @@
     (assert (> address @NIL))
     (format nil "~c~a" (@get address) (@stringify-atom (@cdr address))))))
 
+(defun @stringify-mapcar (@list) ;; like @evlis, but specialized - stringify each element of list
+  (cond
+   ;; N.B. use of cons and not @cons - we a building a Lisp list for printing, not a Sector Lisp list...
+   ((@eq @NIL @list) nil)
+   ((@atomp @list) (assert nil)) ;; arg should always be a list (or NIL)
+   (t (cons (@stringify (@car @list)) (@stringify-mapcar (@cdr @list))))))
+
 (defun @stringify-list (address)
   (cond
     (t
      (let ((car-string (@stringify (@car address)))
-	   (cdr-string (@stringify (@cdr address))))
-       (format nil "(~a . ~a)" car-string cdr-string)))))
+	   (rest-string-list (@stringify-mapcar (@cdr address))))
+       (format nil "(~a ~{~a~^ ~})" car-string rest-string-list)))))
 
+(defun @raw-print (lisp-string)
+  (format *standard-output* "~a~%" lisp-string))
+
+(defun @print-string (lisp-string)
+  (@raw-print lisp-string))
 ;;;
 
 (defun list-cells ()
@@ -306,19 +331,18 @@
 
 (defun main ()
   (initialize-memory)
-  ;; (quote A)
   (let ((index-G (@putatom '(#\G)))
         (index-H (@putatom '(#\H))))
 
-    ;; (quote (G H))
+    ;; (G H)
     (let ((listGH
-           (@cons
-                   (@cons index-G 
-                                (@cons index-H @NIL))
-                   @NIL)))
+           (@cons index-G 
+                  (@cons index-H @NIL))))
       (@print listGH)
-      ;; (car (quote (G H)))
-      (let ((car-quote-listGH (@cons kCar (@cons kQuote listGH))))
-	(@print car-quote-listGH)
-        (let ((result (@eval car-quote-listGH @NIL)))
-          (format *standard-output* "LSP=~a~%memory: ~a~%list: ~a~%~a~%" *next-free-list-pointer* *memory* (list-cells) result))))))
+      (let ((quote-listGH (@cons kQuote (@cons listGH @NIL))))
+        (@print quote-listGH)
+        (let ((car-quote-listGH (@cons kCar (@cons quote-listGH @nil))))
+          (@print car-quote-listGH)
+          (let ((result (@eval car-quote-listGH @NIL)))
+            (@print result)
+            (format *standard-output* "LSP=~a~%memory: ~a~%list: ~a~%~a~%" *next-free-list-pointer* *memory* (list-cells) result)))))))
