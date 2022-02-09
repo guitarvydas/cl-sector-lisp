@@ -31,6 +31,8 @@
 (defconstant @NIL kNil)
 
 (defun @atomp (p) (>= p @NIL))
+(defun @nullp (p) (= p @NIL))
+(defun @address= (p q) (= p q))
 
 (defun @putatombyte (v)
   (@put *next-free-atom-pointer* v)
@@ -133,7 +135,7 @@
   (let ((previous-SP *next-free-list-pointer*))
     (cond
       ((= e @NIL) @NIL)
-      ((> e @NIL) (@assoc e env))
+      ((@atomp e) (@assoc e env))
       ((@eq (@car e) kQuote) (@car (@cdr e)))
       ((@eq (@cdr e) kCond) (@evcon (@cdr e) env))
       (t (let ((v (@apply (@car e) (@evlis (@cdr e) env) env)))
@@ -172,7 +174,7 @@
 
     ((@eq f kAtom) 
      (let ((first-arg (@car args)))
-       (>= first-arg @NIL)))
+       (@atomp first-arg)))
 
     ((@eq f kCar) 
      (let ((first-arg (@car args)))
@@ -208,7 +210,7 @@
 	(rest-of-pairings (@cdr env)))
     (let ((first-name (@car first-pairing)))
       (cond
-	((= name first-name)
+	((@address= name first-name)
 	 (let ((first-value (@car (@cdr first-pairing))))
 	   first-value))
 	(t (@assoc name rest-of-pairings))))))
@@ -275,25 +277,26 @@
 
 (defun @print (address)
   (let ((s (@stringify address)))
-    (@raw-print s)))
+    (let ((str (format nil "~a: ~a" address s)))
+      (@raw-print str))))
 
 (defun @stringify (address)
   (cond 
-   ((@eq @NIL address) "NIL")
-   ((> address @NIL) (@stringify-atom address))
+   ((@nullp address) "NIL")
+   ((@atomp address) (@stringify-atom address))
    (t (@stringify-list address))))
 
 (defun @stringify-atom (address)
   (cond
    ((@eq @NIL address) "")
    (t
-    (assert (> address @NIL))
+    (assert (@atomp address))
     (format nil "~c~a" (@get address) (@stringify-atom (@cdr address))))))
 
 (defun @stringify-mapcar (@list) ;; like @evlis, but specialized - stringify each element of list
   (cond
    ;; N.B. use of cons and not @cons - we a building a Lisp list for printing, not a Sector Lisp list...
-   ((@eq @NIL @list) nil)
+   ((@nullp @list) nil)
    ((@atomp @list) (assert nil)) ;; arg should always be a list (or NIL)
    (t (cons (@stringify (@car @list)) (@stringify-mapcar (@cdr @list))))))
 
