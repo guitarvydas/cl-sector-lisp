@@ -258,6 +258,34 @@
      (@put (1+ A) B-cdr))))
 
 ;;;;
+
+;;;;; printing
+(defun @print (address)
+  (let ((s (@stringify address)))
+    (format *standard-output* "~a~%" s)))
+
+(defun @stringify (address)
+  (cond 
+   ((@eq @NIL address) "NIL")
+   ((> address @NIL) (@stringify-atom address))
+   (t (@stringify-list address))))
+
+(defun @stringify-atom (address)
+  (cond
+   ((@eq @NIL address) "")
+   (t
+    (assert (> address @NIL))
+    (format nil "~c~a" (@get address) (@stringify-atom (@cdr address))))))
+
+(defun @stringify-list (address)
+  (cond
+    (t
+     (let ((car-string (@stringify (@car address)))
+	   (cdr-string (@stringify (@cdr address))))
+       (format nil "(~a . ~a)" car-string cdr-string)))))
+
+;;;
+
 (defun list-cells ()
   (let ((i (1+ *next-free-list-pointer*))
         (stop @NIL)
@@ -288,6 +316,9 @@
                    (@cons index-G 
                                 (@cons index-H @NIL))
                    @NIL)))
-      (let ((list-to-be-interpreted (@cons kQuote listGH)))
-        (let ((result (@eval list-to-be-interpreted @NIL)))
+      (@print listGH)
+      ;; (car (quote (G H)))
+      (let ((car-quote-listGH (@cons kCar (@cons kQuote listGH))))
+	(@print car-quote-listGH)
+        (let ((result (@eval car-quote-listGH @NIL)))
           (format *standard-output* "LSP=~a~%memory: ~a~%list: ~a~%~a~%" *next-free-list-pointer* *memory* (list-cells) result))))))
