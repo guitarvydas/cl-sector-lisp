@@ -23,13 +23,17 @@
     (setf (aref *memory* ix) v))
     index)
 
-(defparameter *next-free-list-pointer* -1)
+(defparameter *mru-list-pointer* 0) ;; mru == "most recently used"
 (defparameter *next-free-atom-pointer* 0)
 
 
 (defconstant kNil 0)
 (defconstant @NIL kNil)
 
+(defun @atom? (p) (>= p @NIL))
+(defun @null? (p) (= p @NIL))
+;;(defun @address=? (p q) (= p q)) ;; see @eq below
+(defun @list? (p) (< p @NIL))    ;; is @NIL a list?  not in this definition...
 (defun @putatombyte (v)
   (@put *next-free-atom-pointer* v)
   (incf *next-free-atom-pointer*))
@@ -41,20 +45,19 @@
     index))
 
 (defun bumplist ()
-  (decf *next-free-list-pointer*))
+  (decf *mru-list-pointer*))
 
 (defun @putlistcell (vcar vcdr)
-    (@put *next-free-list-pointer* vcdr)
     (bumplist)
-    (let ((index *next-free-list-pointer*))
-      (@put *next-free-list-pointer* vcar)
-      (bumplist)
-      index))
+    (@put *mru-list-pointer* vcdr)
+    (bumplist)
+    (@put *mru-list-pointer* vcar)
+    *mru-list-pointer*)
 
 
 (defun @putatom (chars)
   (if (null chars)
-      0
+      @NIL
     (let ((atom-index *next-free-atom-pointer*))
       (@putatombyte (car chars))
       (let ((cdr-address *next-free-atom-pointer*))
@@ -88,7 +91,7 @@
 
 (defun initialize-memory ()
   (setf *memory* (make-array (memsize) :initial-element @NIL))
-  (setf *next-free-list-pointer* -1)
+  (setf *mru-list-pointer* 0)
   (setf *next-free-atom-pointer* 0)
   (let ((i +min-address+))
     (loop 
@@ -121,58 +124,67 @@
 
 (defun @eq (index-A index-B)
   (= index-A index-B))
-
+(defun @address=? (a b) (@eq a b))
 
 ;; evaluator
 (defun @eval (e env)
-  (let ((previous-SP *next-free-list-pointer*))
+  (@print-string "@eval")
+  (@print e)
+  (@print env)
+  (let ((previous-SP *mru-list-pointer*))
     (cond
-      ((= e 0) 0)
-      ((eq (@car e) kQuote) (@car (@cdr e)))
-      ((eq (@cdr e) kCond) (@evcon (@cdr e) env))
-      ((> e 0) (@assoc e env))
-      (t (let ((v (@apply (@car e) (@evlis e env) env)))
+      ((@null? e) @NIL)
+      ((@atom? e) (@assoc e env))
+      ((@eq (@car e) kQuote) (@car (@cdr e)))
+      ((@eq (@cdr e) kCond) (@evcon (@cdr e) env))
+      (t (let ((v (@apply (@car e) (@evlis (@cdr e) env) env)))
 	   (@gc previous-SP v))))))
 
 (defun @apply (f args env)
+  (@print-string "@apply")
+  (@print f)
+  (@print args)
+  (@print env)
   ;; apply function f to a *list* of values (args) in given environment
   (cond
 
-    ((< f 0) 
+    ((@list? f) 
      ;; we have ((... f ...) (... exprs ...))
      ;; f is a list with the shape (lambda (args ...) (body ...))
      ;; the car of the cdr is (args ...)
      ;; the car of the cddr is (body ...)
      ;; the actual exprs that are to be bound to the args is args
-     (let ((arg-names (@car (@cdr f)))
-           (body (@car (@cdr (@cdr f)))))
-     (let ((new-env (@pairlis arg-names args env)))
-       (@eval body new-env))))
+     (let ((ignore-should-be-lambda (@car f))  ;; first
+	   (arg-names (@car (@cdr f)))         ;; second
+           (body      (@car (@cdr (@cdr f))))) ;; third
+       (declare (ignore ignore-should-be-lambda))
+       (let ((new-env (@pairlis arg-names args env)))
+	 (@eval body new-env))))
 
-    ((eq f kEQ) 
+    ((@eq f kEQ) 
      (let ((first-arg (@car args))
 	   (second-arg (@car (@cdr args))))
        (@eq first-arg second-arg)))
 
-    ((eq f kCons) 
+    ((@eq f kCons) 
      (let ((first-arg (@car args))
 	   (second-arg (@car (@cdr args))))
        (@cons first-arg second-arg)))
 
-    ((eq f kAtom) 
+    ((@eq f kAtom) 
      (let ((first-arg (@car args)))
-       (>= first-arg 0)))
+       (@atom? first-arg)))
 
-    ((eq f kCar) 
+    ((@eq f kCar) 
      (let ((first-arg (@car args)))
        (@car first-arg)))
 
-    ((eq f kCdr) 
+    ((@eq f kCdr) 
      (let ((first-arg (@car args)))
        (@cdr first-arg)))
 
     (t
-     (let ((anonymous-function (@assoc f env)))
+     (let ((anonymous-function (@assoc f env))) ;; find the value of f
        (@apply anonymous-function args env)))))
 
 
@@ -197,7 +209,7 @@
 	(rest-of-pairings (@cdr env)))
     (let ((first-name (@car first-pairing)))
       (cond
-	((= name first-name)
+	((@address=? name first-name)
 	 (let ((first-value (@car (@cdr first-pairing))))
 	   first-value))
 	(t (@assoc name rest-of-pairings))))))
@@ -206,7 +218,7 @@
   ;; expr-list is a list of expressions which will form the args to a function
   ;; eval each arg, return a list of eval()ed args
   (cond
-    ((null expr-list) @NIL)
+    ((@null? expr-list) @NIL)
     (t
      (let ((first-expr (@car expr-list))
 	   (rest-of-exprs (@cdr expr-list)))
@@ -224,7 +236,7 @@
 	(rest-of-pairs (@cdr list-to-be-interpreted-as-a-condition)))
     (let ((guard (@car first-pair)))
       (let ((guard-value (@eval guard env)))
-	(cond ((> guard-value 0)
+	(cond ((> guard-value @NIL)
 	       (let ((expr (@car first-pair)))
 		 (let ((expr-value (@eval expr env)))
 		   expr-value)))
@@ -239,17 +251,41 @@
         (@cons car-copy cdr-copy))
     index))
 
+;;; function Gc(A, x) {
+;;;   var C, B = cx;
+;;;   x = Copy(x, A, A - B), C = cx;
+;;;   while (C < B) Set(--A, Get(--B));
+;;;   return cx = A, x;
+;;; }
+;;;
+;;; ;;; unwind comma-exprs
+;;; function Gc(A, x) {
+;;;   var C;
+;;;   var B = cx;
+;;;   Copy(x, A, A - B)
+;;;   C = cx;
+;;;   x = C;
+;;;   while (C < B) Set(--A, Get(--B));
+;;;   cx = A;
+;;;   return x;
+;;; }
 (defun @gc (A index)
-  (let ((B *next-free-list-pointer*))
+  (let ((B *mru-list-pointer*))
     (let ((copied-cell-index (@copy index A (- A B))))
-      (let ((C *next-free-list-pointer*)) ;; updated by above line
+      (let ((C *mru-list-pointer*)) ;; updated by above line
         (@move A B C)
-        (setf *next-free-list-pointer* A)
+        (setf *mru-list-pointer* A)
         copied-cell-index))))
 
 (defun @move (A B C)
+  ;; A is the previous stack (cell) pointer
+  ;; B is the bottom of the new stuff
+  ;; C is the top of the new stuff
+  ;; Move new cells into slots above A, from bottom-up (to avoid overwriting new stuff)
+  ;; stop when everything below C has been copied
+  ;; basically: copy from B to A, bump A and B, until B has reached C
   (loop
-   (when (< C B) (return))
+   (when (>= C B) (return))
    (decf A)
    (decf B)
    (let ((B-car (@car B))
@@ -259,7 +295,59 @@
 
 ;;;;
 
-(defun main ()
+;;;;; printing
+
+
+(defun @print (address)
+  (let ((s (@stringify address)))
+    (let ((str (format nil "~a: ~a" address s)))
+      (@raw-print str))))
+
+(defun @stringify (address)
+  (cond 
+   ((@null? address) "NIL")
+   ((@atom? address) (@stringify-atom address))
+   (t (@stringify-list address))))
+
+(defun @stringify-atom (address)
+  (cond
+   ((@null? address) "")
+   (t
+    (assert (@atom? address))
+    (format nil "~c~a" (@get address) (@stringify-atom (@cdr address))))))
+
+(defun @stringify-mapcar (@list) ;; like @evlis, but specialized - stringify each element of list
+  (cond
+   ;; N.B. use of cons and not @cons - we a building a Lisp list for printing, not a Sector Lisp list...
+   ((@null? @list) nil)
+   ((@atom? @list) (assert nil)) ;; arg should always be a list (or NIL)
+   (t (cons (@stringify (@car @list)) (@stringify-mapcar (@cdr @list))))))
+
+(defun @stringify-list (address)
+  (cond
+    (t
+     (let ((car-string (@stringify (@car address)))
+	   (rest-string-list (@stringify-mapcar (@cdr address))))
+       (format nil "(~a ~{~a~^ ~})" car-string rest-string-list)))))
+
+(defun @raw-print (lisp-string)
+  (format *standard-output* "~a~%" lisp-string))
+
+(defun @print-string (lisp-string)
+  (@raw-print lisp-string))
+;;;
+
+(defun list-cells ()
+  (let ((i *mru-list-pointer*)
+        (stop @NIL)
+        (result nil))
+    (loop
+     (when (>= i stop) (return))
+     (push (@get i) result)
+     (incf i))
+    (reverse result)))
+
+(defun main0 ()
   (initialize-memory)
   ;; (quote A)
   (let ((index-A (@putatom '(#\A))))
@@ -269,9 +357,43 @@
 
 (defun main1 ()
   (initialize-memory)
-  ;; (quote A)
   (let ((index-G (@putatom '(#\G)))
         (index-H (@putatom '(#\H))))
-    (let ((list-to-be-interpreted (@cons index-G (@cons index-H @NIL))))
-      (let ((result (@eval list-to-be-interpreted @NIL)))
-	(format *standard-output* "~a~%" result)))))
+
+    ;; (G H)
+    (let ((listGH
+           (@cons index-G 
+                  (@cons index-H @NIL))))
+      (@print listGH)
+      (let ((quote-listGH (@cons kQuote (@cons listGH @NIL))))
+        (@print quote-listGH)
+        (let ((car-quote-listGH (@cons kCar (@cons quote-listGH @nil))))
+          (@print car-quote-listGH)
+          (let ((result (@eval car-quote-listGH @NIL)))
+            (@print result)
+            (format *standard-output* "LSP=~a~%memory: ~a~%list: ~a~%~a~%" *mru-list-pointer* *memory* (list-cells) result)))))))
+
+(defun main ()
+  (initialize-memory)
+  (let ((index-G (@putatom '(#\G)))
+        (index-H (@putatom '(#\H)))
+        (index-I (@putatom '(#\I))))
+
+    ;; (G H)
+    (let ((listGH
+           (@cons index-G 
+                  (@cons index-H @NIL))))
+      (@print listGH)
+      (let ((quote-listGH (@cons kQuote (@cons listGH @NIL))))
+        (@print quote-listGH)
+        (let ((third (@cons kCdr (@cons quote-listGH @nil))))
+          (@print third)
+          (let ((quote-i-third (@cons
+                                (@cons kQuote (@cons index-I @NIL))
+                                (@cons third @NIL))))
+            (@print quote-i-third)
+            (let ((program (@cons kCons quote-i-third)))
+              (@print program)
+              (let ((result (@eval program @NIL)))
+                (@print result)
+                (format *standard-output* "LSP=~a~%memory: ~a~%list: ~a~%~a~%" *mru-list-pointer* *memory* (list-cells) result)))))))))
