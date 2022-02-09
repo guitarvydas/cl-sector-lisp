@@ -30,10 +30,10 @@
 (defconstant kNil 0)
 (defconstant @NIL kNil)
 
-(defun @atomp (p) (>= p @NIL))
-(defun @nullp (p) (= p @NIL))
-(defun @address= (p q) (= p q))
-
+(defun @atom? (p) (>= p @NIL))
+(defun @null? (p) (= p @NIL))
+;;(defun @address=? (p q) (= p q)) ;; see @eq below
+(defun @list? (p) (< p @NIL))    ;; is @NIL a list?  not in this definition...
 (defun @putatombyte (v)
   (@put *next-free-atom-pointer* v)
   (incf *next-free-atom-pointer*))
@@ -125,7 +125,7 @@
 
 (defun @eq (index-A index-B)
   (= index-A index-B))
-
+(defun @address=? (a b) (@eq a b))
 
 ;; evaluator
 (defun @eval (e env)
@@ -134,8 +134,8 @@
   (@print env)
   (let ((previous-SP *next-free-list-pointer*))
     (cond
-      ((= e @NIL) @NIL)
-      ((@atomp e) (@assoc e env))
+      ((@null? e) @NIL)
+      ((@atom? e) (@assoc e env))
       ((@eq (@car e) kQuote) (@car (@cdr e)))
       ((@eq (@cdr e) kCond) (@evcon (@cdr e) env))
       (t (let ((v (@apply (@car e) (@evlis (@cdr e) env) env)))
@@ -149,7 +149,7 @@
   ;; apply function f to a *list* of values (args) in given environment
   (cond
 
-    ((< f @NIL) 
+    ((@list? f) 
      ;; we have ((... f ...) (... exprs ...))
      ;; f is a list with the shape (lambda (args ...) (body ...))
      ;; the car of the cdr is (args ...)
@@ -174,7 +174,7 @@
 
     ((@eq f kAtom) 
      (let ((first-arg (@car args)))
-       (@atomp first-arg)))
+       (@atom? first-arg)))
 
     ((@eq f kCar) 
      (let ((first-arg (@car args)))
@@ -210,7 +210,7 @@
 	(rest-of-pairings (@cdr env)))
     (let ((first-name (@car first-pairing)))
       (cond
-	((@address= name first-name)
+	((@address=? name first-name)
 	 (let ((first-value (@car (@cdr first-pairing))))
 	   first-value))
 	(t (@assoc name rest-of-pairings))))))
@@ -219,7 +219,7 @@
   ;; expr-list is a list of expressions which will form the args to a function
   ;; eval each arg, return a list of eval()ed args
   (cond
-    ((null expr-list) @NIL)
+    ((@null? expr-list) @NIL)
     (t
      (let ((first-expr (@car expr-list))
 	   (rest-of-exprs (@cdr expr-list)))
@@ -252,6 +252,24 @@
         (@cons car-copy cdr-copy))
     index))
 
+;;; function Gc(A, x) {
+;;;   var C, B = cx;
+;;;   x = Copy(x, A, A - B), C = cx;
+;;;   while (C < B) Set(--A, Get(--B));
+;;;   return cx = A, x;
+;;; }
+;;;
+;;; ;;; unwind comma-exprs
+;;; function Gc(A, x) {
+;;;   var C;
+;;;   var B = cx;
+;;;   Copy(x, A, A - B)
+;;;   C = cx;
+;;;   x = C;
+;;;   while (C < B) Set(--A, Get(--B));
+;;;   cx = A;
+;;;   return x;
+;;; }
 (defun @gc (A index)
   (let ((B *next-free-list-pointer*))
     (let ((copied-cell-index (@copy index A (- A B))))
@@ -282,22 +300,22 @@
 
 (defun @stringify (address)
   (cond 
-   ((@nullp address) "NIL")
-   ((@atomp address) (@stringify-atom address))
+   ((@null? address) "NIL")
+   ((@atom? address) (@stringify-atom address))
    (t (@stringify-list address))))
 
 (defun @stringify-atom (address)
   (cond
-   ((@eq @NIL address) "")
+   ((@null? address) "")
    (t
-    (assert (@atomp address))
+    (assert (@atom? address))
     (format nil "~c~a" (@get address) (@stringify-atom (@cdr address))))))
 
 (defun @stringify-mapcar (@list) ;; like @evlis, but specialized - stringify each element of list
   (cond
    ;; N.B. use of cons and not @cons - we a building a Lisp list for printing, not a Sector Lisp list...
-   ((@nullp @list) nil)
-   ((@atomp @list) (assert nil)) ;; arg should always be a list (or NIL)
+   ((@null? @list) nil)
+   ((@atom? @list) (assert nil)) ;; arg should always be a list (or NIL)
    (t (cons (@stringify (@car @list)) (@stringify-mapcar (@cdr @list))))))
 
 (defun @stringify-list (address)
