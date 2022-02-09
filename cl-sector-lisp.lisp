@@ -23,7 +23,7 @@
     (setf (aref *memory* ix) v))
     index)
 
-(defparameter *next-free-list-pointer* -1)
+(defparameter *mru-list-pointer* 0) ;; mru == "most recently used"
 (defparameter *next-free-atom-pointer* 0)
 
 
@@ -45,15 +45,14 @@
     index))
 
 (defun bumplist ()
-  (decf *next-free-list-pointer*))
+  (decf *mru-list-pointer*))
 
 (defun @putlistcell (vcar vcdr)
-    (@put *next-free-list-pointer* vcdr)
     (bumplist)
-    (let ((index *next-free-list-pointer*))
-      (@put *next-free-list-pointer* vcar)
-      (bumplist)
-      index))
+    (@put *mru-list-pointer* vcdr)
+    (bumplist)
+    (@put *mru-list-pointer* vcar)
+    *mru-list-pointer*)
 
 
 (defun @putatom (chars)
@@ -92,7 +91,7 @@
 
 (defun initialize-memory ()
   (setf *memory* (make-array (memsize) :initial-element @NIL))
-  (setf *next-free-list-pointer* -1)
+  (setf *mru-list-pointer* 0)
   (setf *next-free-atom-pointer* 0)
   (let ((i +min-address+))
     (loop 
@@ -132,7 +131,7 @@
   (@print-string "@eval")
   (@print e)
   (@print env)
-  (let ((previous-SP *next-free-list-pointer*))
+  (let ((previous-SP *mru-list-pointer*))
     (cond
       ((@null? e) @NIL)
       ((@atom? e) (@assoc e env))
@@ -271,16 +270,22 @@
 ;;;   return x;
 ;;; }
 (defun @gc (A index)
-  (let ((B *next-free-list-pointer*))
+  (let ((B *mru-list-pointer*))
     (let ((copied-cell-index (@copy index A (- A B))))
-      (let ((C *next-free-list-pointer*)) ;; updated by above line
+      (let ((C *mru-list-pointer*)) ;; updated by above line
         (@move A B C)
-        (setf *next-free-list-pointer* A)
+        (setf *mru-list-pointer* A)
         copied-cell-index))))
 
 (defun @move (A B C)
+  ;; A is the previous stack (cell) pointer
+  ;; B is the bottom of the new stuff
+  ;; C is the top of the new stuff
+  ;; Move new cells into slots above A, from bottom-up (to avoid overwriting new stuff)
+  ;; stop when everything below C has been copied
+  ;; basically: copy from B to A, bump A and B, until B has reached C
   (loop
-   (when (< C B) (return))
+   (when (>= C B) (return))
    (decf A)
    (decf B)
    (let ((B-car (@car B))
@@ -333,7 +338,7 @@
 ;;;
 
 (defun list-cells ()
-  (let ((i (1+ *next-free-list-pointer*))
+  (let ((i *mru-list-pointer*)
         (stop @NIL)
         (result nil))
     (loop
@@ -366,4 +371,4 @@
           (@print car-quote-listGH)
           (let ((result (@eval car-quote-listGH @NIL)))
             (@print result)
-            (format *standard-output* "LSP=~a~%memory: ~a~%list: ~a~%~a~%" *next-free-list-pointer* *memory* (list-cells) result)))))))
+            (format *standard-output* "LSP=~a~%memory: ~a~%list: ~a~%~a~%" *mru-list-pointer* *memory* (list-cells) result)))))))
