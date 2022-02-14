@@ -28,19 +28,32 @@
 (defun sl-car (index)
   (char-code (getc index)))
 
-(defmethod advance-to-next-nil ((self atom-memory) index)
-  (assert (not (@null? index)))
-  (if (@null? (@cdr index))
-      (if (mem-end? self index)
-          index
-        (+ +cell-size+ index))
-    (advance-to-next-nil self (@cdr index))))
+(defmethod next-cell ((self atom-memory) cell-index)
+  (declare (ignore self))
+  (+ +cell-size+ cell-index))
+
+(defmethod maxed-out ((self atom-memory) cell-index)
+  (mem-end? self (next-cell self cell-index)))
 
 (defmethod @advance-to-next-atom ((self atom-memory))
-  (let ((next-null-index (advance-to-next-nil self (@cdr (current-atom-index self)))))
-    (if (>= next-null-index (mem-end self))
-        (setf (current-atom-index self) next-null-index)
-        (setf (current-atom-index self) (1+ next-null-index)))))
+  (let ((cell-index (current-atom-index self)))
+    ;; cell-index might be @NIL - assume that there are >0 characters at @NIL
+    (if (maxed-out self cell-index)
+        cell-index
+      (let ()
+        (setf cell-index (+ +cell-size+ cell-index))
+        ;;;     while not (@null? (@cdr cell-index))
+        ;;;         cell-index := (@cdr cell-index)
+        ;;;     if maxed-out (cell-index)
+        ;;;         return cell-index
+        ;;;     else
+        ;;;         return (@cdr cell-index)
+        (loop while (not (@null? (@cdr cell-index)))
+              do (setf cell-index (@cdr cell-index)))
+        (setf (current-atom-index self)
+              (if (maxed-out self cell-index)
+                  cell-index
+                (next-cell self cell-index)))))))
 
 (defmethod ?current-atom-index ((self atom-memory))
   (current-atom-index self))
