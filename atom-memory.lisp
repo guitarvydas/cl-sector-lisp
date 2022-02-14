@@ -101,4 +101,10 @@
           (format *standard-output* "next atom=~a~%" (current-atom-index mem))
           (let ((quoteeq (?match-string mem "QUOTE")))
             (format *standard-output* "QUOTE match success=~a ~a~%" quoteeq (current-atom-index mem))
-            (values)))))))
+
+            (@advance-to-next-atom mem)
+            (@advance-to-next-atom mem)
+            (let ((eqeq (?match-string mem "EQ")))
+              (format *standard-output* "EQ match success=~a ~a~%" eqeq (current-atom-index mem))
+
+              (values))))))))
