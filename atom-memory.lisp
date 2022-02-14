@@ -17,11 +17,23 @@
 (defmethod mem-end? ((self atom-memory) index)
   (>= (@adjust-index index) (mem-end self)))
 
+(defun getc (i)
+  (let ((n (@get i)))
+    (if (eq 'character (type-of n))
+        n
+      (if (eq 'fixnum (type-of n))
+          (code-char n)
+        (assert nil)))))
+      
+(defun sl-car (index)
+  (char-code (getc index)))
+
 (defmethod advance-to-next-nil ((self atom-memory) index)
-  (if (@null? index)
+  (assert (not (@null? index)))
+  (if (@null? (@cdr index))
       (if (mem-end? self index)
           index
-        (incf index))
+        (+ +cell-size+ index))
     (advance-to-next-nil self (@cdr index))))
 
 (defmethod @advance-to-next-atom ((self atom-memory))
@@ -41,14 +53,6 @@
 
 (defun @NIL-as-char () (code-char @NIL))
 
-(defun getc (i)
-  (let ((n (@get i)))
-    (if (eq 'character (type-of n))
-        n
-      (if (eq 'fixnum (type-of n))
-          (code-char n)
-        (assert nil)))))
-      
 
 (defmethod match-string ((self atom-memory) s atom-index)
   (if (and
@@ -81,6 +85,7 @@
         (format *standard-output* "QUOTE match success=~a ~a~%" quoteeq0 (current-atom-index mem))
         (let ()
           (@advance-to-next-atom mem)
+          (format *standard-output* "next atom=~a~%" (current-atom-index mem))
           (let ((quoteeq (?match-string mem "QUOTE")))
             (format *standard-output* "QUOTE match success=~a ~a~%" quoteeq (current-atom-index mem))
             (values)))))))
