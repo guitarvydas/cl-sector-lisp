@@ -1,6 +1,6 @@
 (defun @read(str)
-  (let ((lstr @listify-string(str)))
-    @lread(lstr)))
+  (let ((lstr (@listify-string sr)))
+    (@lread lstr)))
 
 (defun @listify-string(s)
   (concatenate 'list s))
@@ -18,12 +18,43 @@
 (defun @lread-list (raw-lstr)
   (let ((lstr (@trim-leading-spaces raw-lstr)))
     (if (@empty lstr)
-	@NIL
+	(%NIL)
 	(let ((front (@upto-separator lstr)))
 	  (let ((tail (@after-separator lstr)))
-	    (@cons (@lread front) (@lread-list tail)))))))
+	    (%cons (@lread front) (@lread-list tail)))))))
 
 (defun @lread-atom (raw-lstr)
   (let ((lstr (@trim-leading-spaces raw-lstr)))
     (let ((front (@upto-separator lstr)))
       (let ((tail (@after-separator-inclusive lstr)))
+	(let ((atom-index (@lread front)))
+	  (values atom-index tail))))))
+
+(defun %cons (a b) (cons a b))
+(defun %NIL () nil)
+(defun @trim-leading-spaces (lstr)
+  (if lstr
+      (if (char= #\Space (car lstr))
+	  (@trim-leading-space (cdr lstr))
+	  lstr)
+      nil))
+(defun @upto-separator (lstr)
+  (if (null lstr)
+      nil
+      (if (char= (car lstr) #\Space)
+	  (@upto-separator (cdr lstr))
+	  (if (or (char= (car lstr) #\() (char= (car lstr #\))))
+	      (@upto-separator (cdr lstr))
+	      lstr))))
+(defun @after-separator-inclusive-helper (lstr)
+  (@after-separator-inclusive lstr nil))
+(defun @after-separator-inclusive (lstr accumulator)
+  (if (null lstr)
+      nil
+      (if (char= (car lstr) #\Space)
+	  (@after-separator-inclusive (cdr lstr) accumulator)
+	  (if (or (char= (car lstr) #\() (char= (car lstr #\))))
+	      accumulator
+	      (@after-separator-inclusive (cdr lstr) (cons (car lstr) accumulator))))))
+
+

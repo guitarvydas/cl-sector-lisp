@@ -35,7 +35,7 @@ func @lread-atom (lstr) >> { index lstr }
    let lstr = @trim-leading-spaces (raw-lstr)
        let front = @upto-separator(raw-lstr)
 	   let tail = @after-separator(raw-lstr)
-	       let atom-index = @read(front)
+	       let atom-index = @lread(front)
 		   { atom-index tail }
 	       end let
 	   end let
