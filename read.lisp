@@ -1,42 +1,29 @@
-(defun @read (raw-str mem)
-  (let ((str (@trim-leading-spaces raw-str)))
-    (if (string= "(" (@string-car str))
-        (multiple-value-bind (str-leftovers lis)
-            (@read-list (@string-cdr str) mem)
-          (@need ")" str-leftovers))
-      (@read-atom str mem))))
+(defun @read(str)
+  (let ((lstr @listify-string(str)))
+    @lread(lstr)))
 
-(defun @read-atom (str mem)
-  (@intern str mem))
+(defun @listify-string(s)
+  (concatenate 'list s))
 
-(defun @read-list (str mem)
-  
-  (assert nil)) ;; niy
+(defun @lread(raw-lstr)
+  (let ((lstr (@trim-leading-spaces raw-lstr)))
+    (if (char= #\( (car lstr))
+	(multiple-value-bind (result leftover)
+	    (@read-list lstr)
+	  (if (char= #\) (car leftover))
+	      (values result (cdr leftover))
+	      (@read-error (format nil "while reading list ~a, expected ')' but got ~a" raw-lster leftover))))
+	(@lread-atom lstr))))
 
-(defun @string-car (s break-char)
-  (let ((i (@search-char s break-char)))
-    (@substring-upto s i)))
+(defun @lread-list (raw-lstr)
+  (let ((lstr (@trim-leading-spaces raw-lstr)))
+    (if (@empty lstr)
+	@NIL
+	(let ((front (@upto-separator lstr)))
+	  (let ((tail (@after-separator lstr)))
+	    (@cons (@lread front) (@lread-list tail)))))))
 
-(defun @string-cdr (s break-char)
-  (let ((i (@search-char s break-char)))
-    (@substring-starting-at s i)))
-
-(defun @search-char (s char)
-  (search (list char) s))
-
-(defun @substring-upto (s i)
-  (subseq s 0 i))
-
-(defun @substring-starting-at (s i)
-  (subseq s i))
-
-(defun @trim-leading-spaces (s)
-  (@trim-leading-characters s #\Space))
-
-(defun @trim-leading-characters (s char)
-  (if (= 0 (@search-char s char))
-      (@trim-leading-characters (@substring-starting-at s 1))
-    s))
-
-string-left-trim
-string-right-trim
+(defun @lread-atom (raw-lstr)
+  (let ((lstr (@trim-leading-spaces raw-lstr)))
+    (let ((front (@upto-separator lstr)))
+      (let ((tail (@after-separator-inclusive lstr)))
