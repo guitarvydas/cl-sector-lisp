@@ -1,18 +1,17 @@
 (defclass atom-memory ()
   ((bytes :initarg :bytes :accessor bytes)
-   (current-atom-index :initform @NIL :accessor current-atom-index)
-   (eof :initform nil :accessor eof)))
+   (current-atom-index :initform @NIL :accessor current-atom-index)))
+
+(defmethod reset ((self atom-memory))
+  (setf (current-atom-index self) @NIL))
 
 (defmethod ?eof ((self atom-memory))
-  (mem-end? self (current-atom-index self)))
+  (atoms-end? self (current-atom-index self)))
 
 (defmacro exit-when (pred) `(when ,pred (return)))
 
-(defmethod mem-end ((self atom-memory))
-  (1- (length (bytes self))))
-
-(defmethod mem-end? ((self atom-memory) index)
-  (>= (@adjust-index index) (mem-end self)))
+(defmethod atoms-end? ((self atom-memory) index)
+  (>= (@adjust-index index) (@adjust-index *next-free-atom-pointer*)))
 
 (defun getc (i)
   (let ((n (@get i)))
@@ -30,7 +29,7 @@
   (+ +cell-size+ cell-index))
 
 (defmethod maxed-out ((self atom-memory) cell-index)
-  (mem-end? self (next-cell self cell-index)))
+  (atoms-end? self (next-cell self cell-index)))
 
 (defmethod @advance-to-next-atom ((self atom-memory))
   (let ((cell-index (current-atom-index self)))
