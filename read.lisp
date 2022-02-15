@@ -1,5 +1,5 @@
 (defun @read(str)
-  (let ((lstr (@listify-string sr)))
+  (let ((lstr (@listify-string str)))
     (@lread lstr)))
 
 (defun @listify-string(s)
@@ -9,10 +9,10 @@
   (let ((lstr (@trim-leading-spaces raw-lstr)))
     (if (char= #\( (car lstr))
 	(multiple-value-bind (result leftover)
-	    (@read-list lstr)
+	    (@lread-list lstr)
 	  (if (char= #\) (car leftover))
 	      (values result (cdr leftover))
-	      (@read-error (format nil "while reading list ~a, expected ')' but got ~a" raw-lster leftover))))
+	      (@read-error (format nil "while reading list ~a, expected ')' but got ~a" raw-lstr leftover))))
 	(@lread-atom lstr))))
 
 (defun @lread-list (raw-lstr)
@@ -20,7 +20,7 @@
     (if (@empty lstr)
 	(%NIL)
 	(let ((front (@upto-separator lstr)))
-	  (let ((tail (@after-separator lstr)))
+	  (let ((tail (@after-separator-inclusive lstr)))
 	    (%cons (@lread front) (@lread-list tail)))))))
 
 (defun @lread-atom (raw-lstr)
@@ -35,7 +35,7 @@
 (defun @trim-leading-spaces (lstr)
   (if lstr
       (if (char= #\Space (car lstr))
-	  (@trim-leading-space (cdr lstr))
+	  (@trim-leading-spaces (cdr lstr))
 	  lstr)
       nil))
 (defun @upto-separator (lstr)
@@ -43,18 +43,23 @@
       nil
       (if (char= (car lstr) #\Space)
 	  (@upto-separator (cdr lstr))
-	  (if (or (char= (car lstr) #\() (char= (car lstr #\))))
+	  (if (or (char= (car lstr) #\() (char= (car lstr) #\)))
 	      (@upto-separator (cdr lstr))
 	      lstr))))
-(defun @after-separator-inclusive-helper (lstr)
-  (@after-separator-inclusive lstr nil))
-(defun @after-separator-inclusive (lstr accumulator)
+(defun @after-separator-inclusive (lstr)
+  (@after-separator-inclusive-helper lstr nil))
+(defun @after-separator-inclusive-helper (lstr accumulator)
   (if (null lstr)
       nil
       (if (char= (car lstr) #\Space)
-	  (@after-separator-inclusive (cdr lstr) accumulator)
-	  (if (or (char= (car lstr) #\() (char= (car lstr #\))))
+	  (@after-separator-inclusive-helper (cdr lstr) accumulator)
+	  (if (or (char= (car lstr) #\() (char= (car lstr) #\)))
 	      accumulator
-	      (@after-separator-inclusive (cdr lstr) (cons (car lstr) accumulator))))))
+	      (@after-separator-inclusive-helper (cdr lstr) (cons (car lstr) accumulator))))))
+(defun @empty(s) (= 0 (length s)))
+(defun @read-error (s)
+  (format *error-output* "~a~%" s)
+  (assert nil))
 
-
+(defun rtest ()
+  (@read "x"))
