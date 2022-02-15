@@ -14,7 +14,9 @@
   (initialize-memory)
   (let ((mem (make-instance 'atom-memory :bytes *memory*)))
     (itry "QUOTE" mem)
+    (itry "X" mem)
     (itry "QUOTE" mem)
+    (itry "X" mem)
     (itry "QUOTE" mem)
     ))
 
