@@ -1,13 +1,10 @@
-(defun true () t)
-(defun false () nil)
-
 (defclass atom-memory ()
   ((bytes :initarg :bytes :accessor bytes)
    (current-atom-index :initform @NIL :accessor current-atom-index)
-   (eof :initform (false) :accessor eof)))
+   (eof :initform nil :accessor eof)))
 
 (defmethod ?eof ((self atom-memory))
-  (@null? (current-atom-index self)))
+  (mem-end? self (current-atom-index self)))
 
 (defmacro exit-when (pred) `(when ,pred (return)))
 
@@ -71,14 +68,14 @@
   (if (and
        (@null? atom-index)
        (at-end s))
-      (true)
+      t
     (let ((c-atom (getc atom-index)))
       (if (at-end s)
-          (false)
+          nil
         (let ((c-s (string-car s)))
           (if (char= c-s c-atom)
               (match-string self (string-cdr s) (@cdr atom-index))
-            (false)))))))
+            nil))))))
 
 (defun string-car (s)
   (char s 0))
