@@ -35,7 +35,7 @@
   (let ((cell-index (current-atom-index self)))
     ;; cell-index might be @NIL - assume that there are >0 characters at @NIL
     (if (maxed-out self cell-index)
-        cell-index
+        (setf (current-atom-index self) (next-cell self *next-free-atom-pointer*))
       (let ()
         (setf cell-index (+ +cell-size+ cell-index))
         ;;;     while not (@null? (@cdr cell-index))
