@@ -27,8 +27,9 @@
   (let ((lstr (@trim-leading-spaces raw-lstr)))
     (let ((front (@upto-separator lstr)))
       (let ((tail (@after-separator-inclusive lstr)))
-	(let ((atom-index (@lread front)))
-	  (values atom-index tail))))))
+        (let ((astring (collapse-character-list-to-string front)))
+          (let ((atom-index (@intern astring)))
+            (values atom-index tail)))))))
 
 (defun %cons (a b) (cons a b))
 (defun %NIL () nil)
@@ -63,5 +64,12 @@
   (format *error-output* "~a~%" s)
   (assert nil))
 
+(defun collapse-character-list-to-string (l)
+  (format nil "~{~a~}" l))
+
+(defun @intern (s)
+  (intern s))
+
 (defun rtest ()
-  (@read "x"))
+  (@read "X"))
+
