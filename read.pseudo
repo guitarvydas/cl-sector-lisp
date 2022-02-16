@@ -24,7 +24,7 @@ func @lread-list (raw-lstr) >> { list lstr }
 	else
 	   let front = @upto-separator(lstr)
 	       let tail = @after-separator(lstr)
-		 @cons (@lread(front) @lread-list(tail))
+		 @reverse (@cons (@lread(front) @lread-list(tail)))
 	       end let
 	   end let
        end if

@@ -10,7 +10,7 @@
     (when lstr
       (if (char= #\( (car lstr))
           (multiple-value-bind (result leftover)
-              (@lread-list lstr)
+              (@lread-list (cdr lstr))
             (if (null leftover)
                 (values result nil)
               (if (char= #\) (car leftover))
@@ -42,14 +42,14 @@
 	  (@trim-leading-spaces (cdr lstr))
 	  lstr)
       nil))
+
 (defun @upto-separator (lstr)
-  (reverse (@upto-separator-helper lstr)))
-(defun @upto-separator-helper (lstr)
   (if (null lstr)
       nil
       (if (@is-separator (car lstr))
           nil
-        (cons (car lstr) (@upto-separator-helper (cdr lstr))))))
+        (cons (car lstr) (@upto-separator (cdr lstr))))))
+
 (defun @after-separator-inclusive (lstr)
   (@after-separator-inclusive-helper lstr))
 (defun @after-separator-inclusive-helper (lstr)
@@ -73,10 +73,32 @@
 (defun @intern (s)
   (intern s))
 
-(defun rtry (s)
-  (format *error-output* "~s -> ~a~%" s (@lread-atom (@listify-string s))))
+(defun @reverse (l)
+  (reverse l))
+
+
+
+
+(defun rtry-a (s)
+  (multiple-value-bind (result leftover)
+      (@lread-atom (@listify-string s))
+    (format *error-output* "~s -> ~a ~a~%" s result leftover)))
+
+(defun rtry-l (s)
+  (multiple-value-bind (result leftover)
+      (@lread-list (@listify-string s))
+    (format *error-output* "~s -> ~a ~a~%" s result leftover)))
+
+(defun rtry-r (s)
+  (multiple-value-bind (result leftover)
+      (@read s)
+    (format *error-output* "~s -> ~a ~a~%" s result leftover)))
 
 (defun rtest ()
-  (rtry "X")
+  (rtry-a "X")
+  (rtry-r "Y")
+  (rtry-r "(Z)")
+  (rtry-r "(A B)")
+  (rtry-r "((E))")
   (values))
 
