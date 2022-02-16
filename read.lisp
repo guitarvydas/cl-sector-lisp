@@ -132,9 +132,17 @@
    ((null L) @NIL)
    ((atom L) (@intern (symbol-name L) mem))
    (t (@cons (convert-lisp-to-sl (car L) mem)
-             (mapcar #'(lambda (x)
-                         (convert-lisp-to-sl x mem))
-                     (cdr L))))))
+             (let ((r (mapcar #'(lambda (x)
+                                  (convert-lisp-to-sl x mem))
+                              (cdr L))))
+               (convert-lisp-to-sl-top-level-only r mem))))))
+
+(defun convert-lisp-to-sl-top-level-only (L mem)
+  (cond
+   ((null L) @NIL)
+   ((atom L) L)
+   (t (@cons (car L) (convert-lisp-to-sl-top-level-only (cdr L) mem)))))
+  
 
 
 (defun rtry-a (s)
@@ -165,5 +173,7 @@
 
   (initialize-memory)
   (let ((mem (make-instance 'atom-memory :bytes *memory*)))
-    (values (@read  "A" mem)
+    (values (@read  "(A)" mem)
+            *memory*)
+    (values (@read  "(A B)" mem)
             *memory*)))
