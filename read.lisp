@@ -7,13 +7,16 @@
 
 (defun @lread(raw-lstr)
   (let ((lstr (@trim-leading-spaces raw-lstr)))
-    (if (char= #\( (car lstr))
-	(multiple-value-bind (result leftover)
-	    (@lread-list lstr)
-	  (if (char= #\) (car leftover))
-	      (values result (cdr leftover))
-	      (@read-error (format nil "while reading list ~a, expected ')' but got ~a" raw-lstr leftover))))
-	(@lread-atom lstr))))
+    (when lstr
+      (if (char= #\( (car lstr))
+          (multiple-value-bind (result leftover)
+              (@lread-list lstr)
+            (if (null leftover)
+                (values result nil)
+              (if (char= #\) (car leftover))
+                  (values result (cdr leftover))
+                (@read-error (format nil "while reading list ~a, expected ')' but got ~a" raw-lstr leftover)))))
+        (@lread-atom lstr)))))
 
 (defun @lread-list (raw-lstr)
   (let ((lstr (@trim-leading-spaces raw-lstr)))
@@ -70,6 +73,10 @@
 (defun @intern (s)
   (intern s))
 
+(defun rtry (s)
+  (format *error-output* "~s -> ~a~%" s (@lread-atom (@listify-string s))))
+
 (defun rtest ()
-  (@read "X"))
+  (rtry "X")
+  (values))
 
