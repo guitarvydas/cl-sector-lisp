@@ -171,6 +171,8 @@
   (rtry-r "(H(I J)K)")
   (rtry-r "( L ( M N ) O )")
 
+  (rtry-r "((LAMBDA (X) (QUOTE X)) (CONS (QUOTE A) (QUOTE B)))")
+
   (initialize-memory)
   (let ((mem (make-instance 'atom-memory :bytes *memory*)))
     (values (@read  "(A)" mem)
@@ -179,6 +181,10 @@
             *memory*)
     (multiple-value-bind (r tail)
         (values (@read  "( L ( M N ) O )" mem)
+                *memory*)
+      (@print r))
+    (multiple-value-bind (r tail)
+        (values (@read "((LAMBDA (X) (QUOTE X)) (CONS (QUOTE A) (QUOTE B)))"  mem)
                 *memory*)
       (@print r))
     ))

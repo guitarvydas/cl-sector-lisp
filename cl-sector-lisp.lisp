@@ -400,7 +400,10 @@
 
 (defun main ()
   (initialize-memory)
-  ;; (quote A)
-  (let ((program (@read "(QUOTE A)")))
+  ;; (Quote A)
+  (let ((mem (make-instance 'atom-memory :bytes *memory*)))
+    (let ((program (@read "(QUOTE A)" mem)))
       (let ((result (@eval program @NIL)))
-	(format *standard-output* "~a~%" result))))
+	(format *standard-output* "~a~%" result)
+        (@print result)))))
+  
