@@ -11,5 +11,6 @@
                                      (:file "support" :depends-on ("atom-memory"))
                                      (:file "lookup-atom.asc" :depends-on ("support"))
                                      (:file "intern" :depends-on ("lookup-atom.asc"))
-                                     )))
+                                     (:file "read" :depends-on ("intern"))
+                                     ))))
 

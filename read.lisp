@@ -1,4 +1,11 @@
-(defun @read(str)
+(defun @read(str mem)
+  (multiple-value-bind (result remainder)
+      (%read str)
+    (declare (ignore remainder))
+    (convert-lisp-to-sl result mem)))
+
+;; read using CL primitives
+(defun %read(str)
   (catch 'read-failure
     (let ((lstr (@listify-string str)))
       (multiple-value-bind (result remaining)
@@ -6,7 +13,7 @@
         (let ((tail (@trim-leading-spaces remaining)))
           (cond
            ((null tail) (values result nil))
-           ((@is-follow-separator (car tail)) (throw 'read-failure (format nil "too many right parentheses in %s" str)))
+           ((@is-follow-separator (@car tail)) (throw 'read-failure (format nil "too many right parentheses in %s" str)))
            (t (values result tail))))))))
 
 (defun @listify-string(s)
@@ -26,7 +33,7 @@
         (values result-list (cdr leftover))))
 
      ((@is-follow-separator (car lstr)) ;; )
-      (values nil lstr))
+      (values @NIL lstr))
 
      (t (@lread-atom lstr)))))
 
@@ -44,7 +51,7 @@
      (T 
         (multiple-value-bind (front leftover)
             (@lread lstr)
-          (@lmap-read (append1 accumulator front) leftover))))))
+          (@lmap-read (%append1 accumulator front) leftover))))))
 
 (defun @lread-atom (raw-lstr)
   (let ((lstr (@trim-leading-spaces raw-lstr)))
@@ -53,12 +60,9 @@
         (if (null front)
             (values nil tail)
           (let ((astring (collapse-character-list-to-string front)))
-            (let ((atom-index (@intern astring)))
+            (let ((atom-index (intern astring)))
               (values atom-index tail))))))))
 
-(defun %cons (a b) (cons a b))
-(defun %list (x) (cons x nil))
-(defun %NIL () nil)
 (defun @trim-leading-spaces (lstr)
   (if lstr
       (if (char= #\Space (car lstr))
@@ -105,19 +109,40 @@
 (defun collapse-character-list-to-string (l)
   (format nil "~{~a~}" l))
 
-(defun @intern (s)
-  (intern s))
+;; stubbed out calls to sector-lisp (to allow debugging of read using full-blown CL)
+;;; (defun @cons (a b) (cons a b))
+;;; (defun @NIL () nil)
+;;; (defun @intern (s)
+;;;   (intern s))
+
 
 (defun @reverse (l)
   (reverse l))
 
-(defun append1 (L item)
+(defun %append1 (L item)
   ;; append 1 item to end of L
   (if (null L)
-      (%list item)
-    (cons (car L) (append1 (cdr L) item))))
+      (list item)
+    (cons (car L) (%append1 (cdr L) item))))
 
 
+
+(defun convert-lisp-to-sl (L mem)
+  (cond
+   ((null L) @NIL)
+   ((atom L) (@intern (symbol-name L) mem))
+   (t (@cons (convert-lisp-to-sl (car L) mem)
+             (let ((r (mapcar #'(lambda (x)
+                                  (convert-lisp-to-sl x mem))
+                              (cdr L))))
+               (convert-lisp-to-sl-top-level-only r mem))))))
+
+(defun convert-lisp-to-sl-top-level-only (L mem)
+  (cond
+   ((null L) @NIL)
+   ((atom L) L)
+   (t (@cons (car L) (convert-lisp-to-sl-top-level-only (cdr L) mem)))))
+  
 
 
 (defun rtry-a (s)
@@ -130,8 +155,8 @@
 
 (defun rtry-r (s)
   (multiple-value-bind (result leftover)
-      (@read s)
-    (setf *R* result)  ;; debug
+      (%read s)
+    (setf *R* result)   ;; debug
     (setf *L* leftover) ;; debug
     (format *error-output* "~s -> ~s ~s~%" s result leftover)))
 
@@ -145,5 +170,15 @@
   (rtry-r "(F(G))")
   (rtry-r "(H(I J)K)")
   (rtry-r "( L ( M N ) O )")
-  (values))
 
+  (initialize-memory)
+  (let ((mem (make-instance 'atom-memory :bytes *memory*)))
+    (values (@read  "(A)" mem)
+            *memory*)
+    (values (@read  "(B C)" mem)
+            *memory*)
+    (multiple-value-bind (r tail)
+        (values (@read  "( L ( M N ) O )" mem)
+                *memory*)
+      (@print r))
+    ))

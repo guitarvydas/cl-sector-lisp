@@ -400,7 +400,7 @@
 
 (defun main ()
   (initialize-memory)
-  ;; (quote A)
+  ;; (Quote A)
   (let ((program (@read "(QUOTE A)")))
       (let ((result (@eval program @NIL)))
 	(format *standard-output* "~a~%" result))))
