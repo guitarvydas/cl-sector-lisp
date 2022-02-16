@@ -7,7 +7,8 @@
 
 (defun @lread(raw-lstr)
   (let ((lstr (@trim-leading-spaces raw-lstr)))
-    (when lstr
+(format *error-output* "lread trimmed lstr=~s~%" raw-lstr)
+    (if (not (null lstr))
       (if (char= #\( (car lstr))
           (multiple-value-bind (result leftover)
               (@lread-list (cdr lstr))
@@ -16,15 +17,20 @@
               (if (char= #\) (car leftover))
                   (values result (cdr leftover))
                 (@read-error (format nil "while reading list ~a, expected ')' but got ~a" raw-lstr leftover)))))
-        (@lread-atom lstr)))))
+        (@lread-atom lstr))
+      (values nil nil))))
 
 (defun @lread-list (raw-lstr)
   (let ((lstr (@trim-leading-spaces raw-lstr)))
-    (if (@empty lstr)
-	(%NIL)
-	(let ((front (@upto-separator lstr)))
-	  (let ((tail (@after-separator-inclusive lstr)))
-	    (%cons (@lread front) (@lread-list tail)))))))
+    (if (not (null lstr))
+        (if (@is-separator-follow (car lstr))
+            (values nil lstr)
+          (multiple-value-bind (front leftover)
+              (@lread lstr)
+            (multiple-value-bind (more leftovers-from-leftovers)
+                (@lread-list leftover)
+              (values (%cons front more) leftovers-from-leftovers))))
+      (values nil nil))))
 
 (defun @lread-atom (raw-lstr)
   (let ((lstr (@trim-leading-spaces raw-lstr)))
@@ -62,6 +68,11 @@
   (or (char= c #\Space)
       (char= c #\()
       (char= c #\))))
+
+(defun @is-separator-follow (c)
+  (or (char= c #\Space)
+      (char= c #\))))
+
 (defun @empty(s) (= 0 (length s)))
 (defun @read-error (s)
   (format *error-output* "~a~%" s)
@@ -89,10 +100,15 @@
       (@lread-list (@listify-string s))
     (format *error-output* "~s -> ~a ~a~%" s result leftover)))
 
+(defparameter *R* nil)
+(defparameter *L* nil)
+
 (defun rtry-r (s)
   (multiple-value-bind (result leftover)
       (@read s)
-    (format *error-output* "~s -> ~a ~a~%" s result leftover)))
+    (setf *R* result)  ;; debug
+    (setf *L* leftover) ;; debug
+    (format *error-output* "~s -> ~s ~s~%" s result leftover)))
 
 (defun rtest ()
   (rtry-a "X")
