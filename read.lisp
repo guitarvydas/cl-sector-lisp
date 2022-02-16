@@ -6,7 +6,7 @@
         (let ((tail (@trim-leading-spaces remaining)))
           (cond
            ((null tail) (values result nil))
-           ((@is-follow-separator (car tail) (throw 'read-failure (format nil "too many right parentheses in %s" str))))
+           ((@is-follow-separator (car tail)) (throw 'read-failure (format nil "too many right parentheses in %s" str)))
            (t (values result tail))))))))
 
 (defun @listify-string(s)
@@ -17,29 +17,38 @@
     (cond
 
      ((null lstr)
-      (values nil nil))
+      (values nil lstr))
 
-     ((@is-begin-separator (car lstr))
+     ((@is-begin-separator (car lstr)) ;; (
       (multiple-value-bind (result-list leftover)
           (@lmap-read (cdr lstr))
-        (@need-follow-separator leftover raw-lstr)
+        (format *error-output* "lread call lmap-read ~s ~s~%" result-list leftover)
+        (@need-follow-separator leftover raw-lstr) ;; )
         (values result-list (cdr leftover))))
 
-     ((@is-follow-separator (car lstr))
+     ((@is-follow-separator (car lstr)) ;; )
       (values nil lstr))
 
      (t (@lread-atom lstr)))))
 
+(defun db (s)
+  (format *error-output* "[~a]" s))
+
 (defun @lmap-read (raw-lstr)
   (let ((lstr (@trim-leading-spaces raw-lstr)))
-    (if (not (null lstr))
+    (format *error-output* "lmap-read ~s~%" lstr)
+    (cond
+     ((null lstr) (db "a") (values nil nil))
+     ((@is-follow-separator (car lstr)) (db "b") (values nil lstr))
+     (T 
+        (db "c")
         (multiple-value-bind (front leftover)
             (@lread lstr)
-          (let ((tail (@lread leftover)))
+          (format *error-output* "lmap-read front=~a leftover=~s~%" front leftover)
+          (let ((tail (@lmap-read leftover)))
             (if (null front)
                 (values nil tail)
-              (values (%list front) tail))))
-      (values nil nil))))
+              (values (%list front) tail))))))))
 
 (defun @lread-atom (raw-lstr)
   (let ((lstr (@trim-leading-spaces raw-lstr)))
@@ -130,12 +139,12 @@
     (format *error-output* "~s -> ~s ~s~%" s result leftover)))
 
 (defun rtest ()
-  (rtry-a "X")
-  (rtry-r "X")
-  (rtry-r "Y")
-  (rtry-r "(Z)")
-  (rtry-r "(A B)")
-  (rtry-r "((E))")
-  (rtry-r "(F(G))")
+;;;   (rtry-a "X")
+;;;   (rtry-r "X")
+;;;   (rtry-r "Y")
+   (rtry-r "(Z)")
+;  (rtry-r "(A B)")
+;  (rtry-r "((E))")
+;  (rtry-r "(F(G))")
   (values))
 
