@@ -21,7 +21,7 @@
 
      ((@is-begin-separator (car lstr)) ;; (
       (multiple-value-bind (result-list leftover)
-          (@lmap-read (cdr lstr))
+          (@lmap-read nil (cdr lstr))
         (format *error-output* "lread call lmap-read ~s ~s~%" result-list leftover)
         (@need-follow-separator leftover raw-lstr) ;; )
         (values result-list (cdr leftover))))
@@ -34,21 +34,19 @@
 (defun db (s)
   (format *error-output* "[~a]" s))
 
-(defun @lmap-read (raw-lstr)
+(defun @lmap-read (accumulator raw-lstr)
+  ;; objective: create list of items for inside "(" ... ")"
+  ;; read from raw-lstr (skipping spaces) and append to accumulator
+  ;; return (1) accumulated list (2) left-over string
   (let ((lstr (@trim-leading-spaces raw-lstr)))
-    (format *error-output* "lmap-read ~s~%" lstr)
+    (format *error-output* "lmap-read ~s ~s~%" accumulator lstr)
     (cond
-     ((null lstr) (db "a") (values nil nil))
-     ((@is-follow-separator (car lstr)) (db "b") (values nil lstr))
+     ((null lstr) (values accumulator nil))
+     ((@is-follow-separator (car lstr)) (values accumulator lstr))
      (T 
-        (db "c")
         (multiple-value-bind (front leftover)
             (@lread lstr)
-          (format *error-output* "lmap-read front=~a leftover=~s~%" front leftover)
-          (let ((tail (@lmap-read leftover)))
-            (if (null front)
-                (values nil tail)
-              (values (%list front) tail))))))))
+          (@lmap-read (append1 accumulator front) leftover))))))
 
 (defun @lread-atom (raw-lstr)
   (let ((lstr (@trim-leading-spaces raw-lstr)))
@@ -115,17 +113,18 @@
 (defun @reverse (l)
   (reverse l))
 
+(defun append1 (L item)
+  ;; append 1 item to end of L
+  (if (null L)
+      (%list item)
+    (cons (car L) (append1 (cdr L) item))))
+
 
 
 
 (defun rtry-a (s)
   (multiple-value-bind (result leftover)
       (@lread-atom (@listify-string s))
-    (format *error-output* "~s -> ~a ~a~%" s result leftover)))
-
-(defun rtry-l (s)
-  (multiple-value-bind (result leftover)
-      (@lmap-read (@listify-string s))
     (format *error-output* "~s -> ~a ~a~%" s result leftover)))
 
 (defparameter *R* nil)
