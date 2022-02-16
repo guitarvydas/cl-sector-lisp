@@ -1,34 +1,33 @@
 (defun @read(str)
-  (let ((lstr (@listify-string str)))
-    (@lread lstr)))
+  (catch 'read-failure
+    (let ((lstr (@listify-string str)))
+      (@lread lstr))))
 
 (defun @listify-string(s)
   (concatenate 'list s))
 
 (defun @lread(raw-lstr)
   (let ((lstr (@trim-leading-spaces raw-lstr)))
-    (if (not (null lstr))
-      (if (char= #\( (car lstr))
+    (if (null lstr)
+        (values nil nil)
+      (if (@is-begin-separator (car lstr))
           (multiple-value-bind (result leftover)
-              (@lread-list (cdr lstr))
-            (if (null leftover)
-                (values result nil)
-              (if (char= #\) (car leftover))
-                  (values result (cdr leftover))
-                (@read-error (format nil "while reading list ~a, expected ')' but got ~a" raw-lstr leftover)))))
-	  (if (@is-follow-separator (car lstr))
-	      (values nil nil)
-              (@lread-atom lstr)))
-      (values nil nil))))
+              (@lmap-read (cdr lstr))
+            (@need-follow-separator leftover raw-lstr)
+            (values result (cdr leftover)))
+        (if (@is-follow-separator (car lstr))
+            (values nil (cdr lstr))
+          (@lread-atom lstr))))))
 
-(defun @lread-list (raw-lstr)
+(defun @lmap-read (raw-lstr)
   (let ((lstr (@trim-leading-spaces raw-lstr)))
     (if (not (null lstr))
         (multiple-value-bind (front leftover)
             (@lread lstr)
-          (multiple-value-bind (more leftovers-from-leftovers)
-              (@lread leftover)
-            (values (%cons front more) leftovers-from-leftovers)))
+          (let ((tail (@lread leftover)))
+            (if (null front)
+                (values nil tail)
+              (values (%list front) tail))))
       (values nil nil))))
 
 (defun @lread-atom (raw-lstr)
@@ -71,14 +70,22 @@
       (char= c #\()
       (char= c #\))))
 
+(defun @is-begin-separator (c)
+  (char= c #\( ))
+
 (defun @is-follow-separator (c)
-  (or (char= c #\Space)
-      (char= c #\))))
+  (char= c #\) ))
+
+(defun @need-follow-separator (leftover original-string)
+  (if (and (listp leftover) (not (null leftover)) (char= #\) (car leftover)))
+      t
+    (@read-error (format nil "while reading list ~s, expected ')' but got ~s" original-string leftover))))
+
 
 (defun @empty(s) (= 0 (length s)))
 (defun @read-error (s)
   (format *error-output* "~a~%" s)
-  (assert nil))
+  (throw 'read-failure (values nil nil)))
 
 (defun collapse-character-list-to-string (l)
   (format nil "~{~a~}" l))
@@ -99,7 +106,7 @@
 
 (defun rtry-l (s)
   (multiple-value-bind (result leftover)
-      (@lread-list (@listify-string s))
+      (@lmap-read (@listify-string s))
     (format *error-output* "~s -> ~a ~a~%" s result leftover)))
 
 (defparameter *R* nil)
@@ -114,6 +121,7 @@
 
 (defun rtest ()
   (rtry-a "X")
+  (rtry-r "X")
   (rtry-r "Y")
   (rtry-r "(Z)")
   (rtry-r "(A B)")
