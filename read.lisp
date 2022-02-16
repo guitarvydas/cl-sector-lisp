@@ -144,5 +144,6 @@
   (rtry-r "((E))")
   (rtry-r "(F(G))")
   (rtry-r "(H(I J)K)")
+  (rtry-r "( L ( M N ) O )")
   (values))
 
