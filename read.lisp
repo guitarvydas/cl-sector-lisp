@@ -1,23 +1,34 @@
 (defun @read(str)
   (catch 'read-failure
     (let ((lstr (@listify-string str)))
-      (@lread lstr))))
+      (multiple-value-bind (result remaining)
+          (@lread lstr)
+        (let ((tail (@trim-leading-spaces remaining)))
+          (cond
+           ((null tail) (values result nil))
+           ((@is-follow-separator (car tail) (throw 'read-failure (format nil "too many right parentheses in %s" str))))
+           (t (values result tail))))))))
 
 (defun @listify-string(s)
   (concatenate 'list s))
 
 (defun @lread(raw-lstr)
   (let ((lstr (@trim-leading-spaces raw-lstr)))
-    (if (null lstr)
-        (values nil nil)
-      (if (@is-begin-separator (car lstr))
-          (multiple-value-bind (result leftover)
-              (@lmap-read (cdr lstr))
-            (@need-follow-separator leftover raw-lstr)
-            (values result (cdr leftover)))
-        (if (@is-follow-separator (car lstr))
-            (values nil (cdr lstr))
-          (@lread-atom lstr))))))
+    (cond
+
+     ((null lstr)
+      (values nil nil))
+
+     ((@is-begin-separator (car lstr))
+      (multiple-value-bind (result-list leftover)
+          (@lmap-read (cdr lstr))
+        (@need-follow-separator leftover raw-lstr)
+        (values result-list (cdr leftover))))
+
+     ((@is-follow-separator (car lstr))
+      (values nil lstr))
+
+     (t (@lread-atom lstr)))))
 
 (defun @lmap-read (raw-lstr)
   (let ((lstr (@trim-leading-spaces raw-lstr)))
@@ -58,13 +69,12 @@
         (cons (car lstr) (@upto-separator (cdr lstr))))))
 
 (defun @after-separator-inclusive (lstr)
-  (@after-separator-inclusive-helper lstr))
-(defun @after-separator-inclusive-helper (lstr)
   (if (null lstr)
       nil
-      (if (@is-separator (car lstr))
-          (cdr lstr)
-        (@after-separator-inclusive-helper (cdr lstr)))))
+    (if (@is-separator (car lstr))
+        lstr
+      (@after-separator-inclusive (cdr lstr)))))
+
 (defun @is-separator (c)
   (or (char= c #\Space)
       (char= c #\()
@@ -79,7 +89,7 @@
 (defun @need-follow-separator (leftover original-string)
   (if (and (listp leftover) (not (null leftover)) (char= #\) (car leftover)))
       t
-    (@read-error (format nil "while reading list ~s, expected ')' but got ~s" original-string leftover))))
+    (@read-error (format nil "*** ERROR: while reading list ~s, expected ')' but got ~s" original-string leftover))))
 
 
 (defun @empty(s) (= 0 (length s)))
