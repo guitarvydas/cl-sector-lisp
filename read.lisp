@@ -140,8 +140,8 @@
   (rtry-r "X")
   (rtry-r "Y")
   (rtry-r "(Z)")
-;  (rtry-r "(A B)")
-;  (rtry-r "((E))")
-;  (rtry-r "(F(G))")
+  (rtry-r "(A B)")
+  (rtry-r "((E))")
+  (rtry-r "(F(G))")
   (values))
 
