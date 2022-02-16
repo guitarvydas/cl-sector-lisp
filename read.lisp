@@ -22,7 +22,6 @@
      ((@is-begin-separator (car lstr)) ;; (
       (multiple-value-bind (result-list leftover)
           (@lmap-read nil (cdr lstr))
-        (format *error-output* "lread call lmap-read ~s ~s~%" result-list leftover)
         (@need-follow-separator leftover raw-lstr) ;; )
         (values result-list (cdr leftover))))
 
@@ -39,7 +38,6 @@
   ;; read from raw-lstr (skipping spaces) and append to accumulator
   ;; return (1) accumulated list (2) left-over string
   (let ((lstr (@trim-leading-spaces raw-lstr)))
-    (format *error-output* "lmap-read ~s ~s~%" accumulator lstr)
     (cond
      ((null lstr) (values accumulator nil))
      ((@is-follow-separator (car lstr)) (values accumulator lstr))
@@ -138,10 +136,10 @@
     (format *error-output* "~s -> ~s ~s~%" s result leftover)))
 
 (defun rtest ()
-;;;   (rtry-a "X")
-;;;   (rtry-r "X")
-;;;   (rtry-r "Y")
-   (rtry-r "(Z)")
+  (rtry-a "X")
+  (rtry-r "X")
+  (rtry-r "Y")
+  (rtry-r "(Z)")
 ;  (rtry-r "(A B)")
 ;  (rtry-r "((E))")
 ;  (rtry-r "(F(G))")
