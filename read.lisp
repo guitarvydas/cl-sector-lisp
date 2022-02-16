@@ -7,7 +7,6 @@
 
 (defun @lread(raw-lstr)
   (let ((lstr (@trim-leading-spaces raw-lstr)))
-(format *error-output* "lread trimmed lstr=~s~%" raw-lstr)
     (if (not (null lstr))
       (if (char= #\( (car lstr))
           (multiple-value-bind (result leftover)
@@ -28,8 +27,8 @@
           (multiple-value-bind (front leftover)
               (@lread lstr)
             (multiple-value-bind (more leftovers-from-leftovers)
-                (@lread-list leftover)
-              (values (%cons front more) leftovers-from-leftovers))))
+                (@lread leftover)
+              (values (%cons front (%list more)) leftovers-from-leftovers))))
       (values nil nil))))
 
 (defun @lread-atom (raw-lstr)
@@ -41,6 +40,7 @@
             (values atom-index tail)))))))
 
 (defun %cons (a b) (cons a b))
+(defun %list (x) (cons x nil))
 (defun %NIL () nil)
 (defun @trim-leading-spaces (lstr)
   (if lstr
@@ -116,5 +116,6 @@
   (rtry-r "(Z)")
   (rtry-r "(A B)")
   (rtry-r "((E))")
+  (rtry-r "(F(G))")
   (values))
 
