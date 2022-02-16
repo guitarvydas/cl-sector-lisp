@@ -16,19 +16,21 @@
               (if (char= #\) (car leftover))
                   (values result (cdr leftover))
                 (@read-error (format nil "while reading list ~a, expected ')' but got ~a" raw-lstr leftover)))))
-        (@lread-atom lstr))
+	  (if (@is-follow-separator (car lstr))
+	      (values nil nil)
+              (@lread-atom lstr)))
       (values nil nil))))
 
 (defun @lread-list (raw-lstr)
   (let ((lstr (@trim-leading-spaces raw-lstr)))
     (if (not (null lstr))
-        (if (@is-separator-follow (car lstr))
+        (if (@is-follow-separator (car lstr))
             (values nil lstr)
           (multiple-value-bind (front leftover)
               (@lread lstr)
             (multiple-value-bind (more leftovers-from-leftovers)
                 (@lread leftover)
-              (values (%cons front (%list more)) leftovers-from-leftovers))))
+              (values (%cons front more) leftovers-from-leftovers))))
       (values nil nil))))
 
 (defun @lread-atom (raw-lstr)
@@ -69,7 +71,7 @@
       (char= c #\()
       (char= c #\))))
 
-(defun @is-separator-follow (c)
+(defun @is-follow-separator (c)
   (or (char= c #\Space)
       (char= c #\))))
 
