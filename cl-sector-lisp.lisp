@@ -338,7 +338,7 @@
   ;; return a Lisp list of strings, given a Sector Lisp list
   (cond
    ((@null? @list) nil)
-   ((@atom? @list) (list (@stringify @list)))
+   ((@atom? @list) (list (format nil ". ~a" (@stringify @list))))
    (t (cons
        (format nil "~a" (@stringify (@car @list)))
        (@stringify-list-internals (@cdr @list))))))
@@ -441,5 +441,5 @@
       (@print program))
     (let ((program (@read "(CONS (QUOTE E) (QUOTE F))" mem)))
       (let ((v (@eval program @NIL)))
-        (@print program)))
+        (@print v)))
     ))
