@@ -141,7 +141,13 @@
       (t 
        (let ((args (@evlis (@cdr e) env)))
          (let ((v (@apply (@car e) args env)))
-	   (@gc previous-SP v)))))))
+           (@print-string "apply returns to eval")
+           (@print v)
+	   (let ((gced-v (@gc previous-SP v)))
+             (@print-string "after GC")
+             (@print gced-v)
+             gced-v)
+           ))))))
 
 (defun @apply (f args env)
   (@print-string "@apply")
@@ -269,16 +275,22 @@
 ;;;   C = cx;
 ;;;   x = C;
 ;;;   while (C < B) Set(--A, Get(--B));
-;;;   cx = A;
-;;;   return x;
+;;;   A;
+;;;   cx = x;
+;;;   return cx;
+;;; }
+
+;;; should the last 4 lines be?:
+;;;  cx = A;
+;;;  return cx;
 ;;; }
 (defun @gc (A index)
   (let ((B *mru-list-pointer*))
     (let ((copied-cell-index (@copy index A (- A B))))
       (let ((C *mru-list-pointer*)) ;; updated by above line
-        (@move A B C)
-        (setf *mru-list-pointer* A)
-        copied-cell-index))))
+        (let ((new-A (@move A B C)))
+          (setf *mru-list-pointer* new-A)
+          *mru-list-pointer*)))))
 
 (defun @move (A B C)
   ;; A is the previous stack (cell) pointer
@@ -287,14 +299,14 @@
   ;; Move new cells into slots above A, from bottom-up (to avoid overwriting new stuff)
   ;; stop when everything below C has been copied
   ;; basically: copy from B to A, bump A and B, until B has reached C
+  ;; byte-by-byte copy
   (loop
    (when (>= C B) (return))
-   (decf A)
-   (decf B)
-   (let ((B-car (@car B))
-         (B-cdr (@cdr B)))
-     (@put A B-car)
-     (@put (1+ A) B-cdr))))
+   (decf A 1)
+   (decf B 1)
+   (let ((byte (@car B)))
+     (@put A byte)))
+  A)
 
 ;;;;
 
@@ -418,11 +430,8 @@
   (initialize-memory)
   ;; (Quote A)
   (let ((mem (make-instance 'atom-memory :bytes *memory*)))
-;;    (let ((program (@read "( (LAMBDA (X) X) (QUOTE A) )" mem)))
-;;    (let ((program (@read "(CONS (QUOTE Y) NIL )" mem)))
-    (let ((program (@read "( (LAMBDA (P Q) P) (QUOTE C) (QUOTE D))" mem)))
-;;    (let ((program (@read "( (LAMBDA (X) X) (CONS (QUOTE Y) NIL ))" mem)))
-;;    (let ((program (@read "( (LAMBDA (X) (QUOTE Z)) (QUOTE A) )" mem)))
+;;    (let ((program (@read "(CONS (QUOTE A) (QUOTE B))" mem)))
+    (let ((program (@read "((LAMBDA (X) X) (CONS (QUOTE P) (QUOTE Q)))" mem)))
 ;;    (let ((program (@read "((LAMBDA (X) (QUOTE X)) (CONS (QUOTE A) (QUOTE B)))" mem)))
       (let ((result (@eval program @NIL)))
 	(format *standard-output* "~%~%result ~a~%" result)
