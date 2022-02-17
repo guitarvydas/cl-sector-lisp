@@ -154,7 +154,7 @@
   (cond
 
     ((@list? f) 
-     ;; we have ((... f ...) (... exprs ...))
+     ;; we have ((...) (... exprs ...))
      ;; f is a list with the shape (lambda (args ...) (body ...))
      ;; the car of the cdr is (args ...)
      ;; the car of the cddr is (body ...)
@@ -215,7 +215,7 @@
     (let ((first-name (@car first-pairing)))
       (cond
 	((@address=? name first-name)
-	 (let ((first-value (@car (@cdr first-pairing))))
+	 (let ((first-value (@cdr first-pairing)))
 	   first-value))
 	(t (@assoc name rest-of-pairings))))))
 
@@ -324,18 +324,20 @@
 
 (defun @stringify-mapcar (@list) ;; like @evlis, but specialized - stringify each element of list
   (cond
-   ;; N.B. use of cons and not @cons - we a building a Lisp list for printing, not a Sector Lisp list...
+   ;; N.B. use of cons and not @cons - we are building a Lisp list for printing, not a Sector Lisp list...
    ((@null? @list) nil)
-   ((@atom? @list) (assert nil)) ;; arg should always be a list (or NIL)
+   ((@atom? @list) (assert nil))
    (t (cons (@stringify (@car @list)) (@stringify-mapcar (@cdr @list))))))
 
 (defun @stringify-list (address)
-  (cond
-    (t
-     (let ((car-string (@stringify (@car address)))
-	   (rest-string-list (@stringify-mapcar (@cdr address))))
-       (format nil "(~a ~{~a~^ ~})" car-string rest-string-list)))))
-
+  (let ((car-string (@stringify (@car address))))
+    (cond
+     ((and (@atom? (@cdr address)) (not (@null? (@cdr address)))) ;; dotted list, with cdr as atom
+      (format nil "(~a . ~a)" car-string (@stringify-atom (@cdr address))))
+     (t
+      (let ((rest-string-list (@stringify-mapcar (@cdr address))))
+        (format nil "(~a ~{~a~^ ~})" car-string rest-string-list))))))
+  
 (defun @raw-print (lisp-string)
   (format *standard-output* "~a~%" lisp-string))
 
