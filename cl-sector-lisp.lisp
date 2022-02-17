@@ -331,23 +331,17 @@
     (assert (@atom? address))
     (format nil "~c~a" (@get address) (@stringify-atom (@cdr address))))))
 
-(defun @stringify-mapcar (@list) ;; like @evlis, but specialized - stringify each element of list
-  (cond
-   ;; N.B. use of cons and not @cons - we are building a Lisp list for printing, not a Sector Lisp list...
-   ((@null? @list) nil)
-   ((@atom? @list) (assert nil))
-   (t (cons (@stringify (@car @list)) (@stringify-mapcar (@cdr @list))))))
+(defun @stringify-list (@list)
+  (format nil "(~{~a~^ ~})" (@stringify-list-internals @list)))
 
-(defun @stringify-list (address)
-  (let ((car-string (@stringify (@car address))))
-    (cond
-     ((and (@atom? (@cdr address)) (not (@null? (@cdr address)))) ;; dotted list, with cdr as atom
-      (format nil "(~a . ~a)" car-string (@stringify-atom (@cdr address))))
-     ((@null? (@cdr address))
-      (format nil "(~a)" car-string))
-     (t
-      (let ((rest-string-list (@stringify-mapcar (@cdr address))))
-        (format nil "(~a ~{~a~^ ~})" car-string rest-string-list))))))
+(defun @stringify-list-internals (@list)
+  ;; return a Lisp list of strings, given a Sector Lisp list
+  (cond
+   ((@null? @list) nil)
+   ((@atom? @list) (list (@stringify @list)))
+   (t (cons
+       (format nil "~a" (@stringify (@car @list)))
+       (@stringify-list-internals (@cdr @list))))))
   
 (defun @raw-print (lisp-string)
   (format *standard-output* "~a~%" lisp-string))
@@ -426,9 +420,8 @@
 	(format *standard-output* "~a~%" result)
         (@print result)))))
   
-(defun main ()
+(defun main11 ()
   (initialize-memory)
-  ;; (Quote A)
   (let ((mem (make-instance 'atom-memory :bytes *memory*)))
 ;;    (let ((program (@read "(CONS (QUOTE A) (QUOTE B))" mem)))
     (let ((program (@read "((LAMBDA (X) X) (CONS (QUOTE P) (QUOTE Q)))" mem)))
@@ -436,4 +429,17 @@
       (let ((result (@eval program @NIL)))
 	(format *standard-output* "~%~%result ~a~%" result)
         (@print result)))))
-  
+
+(defun main ()
+  (initialize-memory)
+  (let ((mem (make-instance 'atom-memory :bytes *memory*)))
+    (let ((program (@read "A" mem)))
+      (@print program))
+    (let ((program (@read "(B)" mem)))
+      (@print program))
+    (let ((program (@read "(C D)" mem)))
+      (@print program))
+    (let ((program (@read "(CONS (QUOTE E) (QUOTE F))" mem)))
+      (let ((v (@eval program @NIL)))
+        (@print program)))
+    ))
