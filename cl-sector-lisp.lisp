@@ -137,11 +137,9 @@
       (t 
        (let ((args (@evlis (@cdr e) env)))
          (let ((v (@apply (@car e) args env)))
-(@print-string "apply returns ...")
-(@print v)
+(format *standard-output* "list pointer before GC ~a~%" *mru-list-pointer*)
 	   (let ((gced-v (@gc previous-SP v)))
-(@print-string "GC returns ...")
-(@print gced-v)
+(format *standard-output* "list pointer after GC ~a~%" *mru-list-pointer*)
              gced-v)
            ))))))
 
@@ -419,7 +417,7 @@
 	(format *standard-output* "~%~%result ~a~%" result)
         (@print result)))))
 
-(defun main12 ()
+(defun main ()
   (initialize-memory)
   (let ((mem (make-instance 'atom-memory :bytes *memory*)))
     (let ((program (@read "A" mem)))
@@ -441,7 +439,7 @@
         (@print v)))
     ))
 
-(defun main ()
+(defun main13 ()
   (initialize-memory)
   (let ((mem (make-instance 'atom-memory :bytes *memory*)))
     (let ((program (@read "((LAMBDA (X) (QUOTE A)) (CONS (QUOTE I) (QUOTE J)))" mem)))
