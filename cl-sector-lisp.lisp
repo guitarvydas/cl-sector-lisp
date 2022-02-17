@@ -128,8 +128,9 @@
 
 ;; evaluator
 (defun @eval (e env)
-  (@print-string "@eval")
+  (@print-string "@eval e")
   (@print e)
+  (@print-string "@eval env")
   (@print env)
   (let ((previous-SP *mru-list-pointer*))
     (cond
@@ -330,6 +331,8 @@
     (cond
      ((and (@atom? (@cdr address)) (not (@null? (@cdr address)))) ;; dotted list, with cdr as atom
       (format nil "(~a . ~a)" car-string (@stringify-atom (@cdr address))))
+     ((@null? (@cdr address))
+      (format nil "(~a)" car-string))
      (t
       (let ((rest-string-list (@stringify-mapcar (@cdr address))))
         (format nil "(~a ~{~a~^ ~})" car-string rest-string-list))))))
@@ -415,9 +418,13 @@
   (initialize-memory)
   ;; (Quote A)
   (let ((mem (make-instance 'atom-memory :bytes *memory*)))
-    (let ((program (@read "( (LAMBDA (X) X) (QUOTE A) )" mem)))
+;;    (let ((program (@read "( (LAMBDA (X) X) (QUOTE A) )" mem)))
+;;    (let ((program (@read "(CONS (QUOTE Y) NIL )" mem)))
+    (let ((program (@read "( (LAMBDA (P Q) P) (QUOTE C) (QUOTE D))" mem)))
+;;    (let ((program (@read "( (LAMBDA (X) X) (CONS (QUOTE Y) NIL ))" mem)))
+;;    (let ((program (@read "( (LAMBDA (X) (QUOTE Z)) (QUOTE A) )" mem)))
 ;;    (let ((program (@read "((LAMBDA (X) (QUOTE X)) (CONS (QUOTE A) (QUOTE B)))" mem)))
       (let ((result (@eval program @NIL)))
-	(format *standard-output* "~a~%" result)
+	(format *standard-output* "~%~%result ~a~%" result)
         (@print result)))))
   
