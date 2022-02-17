@@ -128,10 +128,6 @@
 
 ;; evaluator
 (defun @eval (e env)
-  (@print-string "@eval e")
-  (@print e)
-  (@print-string "@eval env")
-  (@print env)
   (let ((previous-SP *mru-list-pointer*))
     (cond
       ((@null? e) @NIL)
@@ -141,19 +137,15 @@
       (t 
        (let ((args (@evlis (@cdr e) env)))
          (let ((v (@apply (@car e) args env)))
-           (@print-string "apply returns to eval")
-           (@print v)
+(@print-string "apply returns ...")
+(@print v)
 	   (let ((gced-v (@gc previous-SP v)))
-             (@print-string "after GC")
-             (@print gced-v)
+(@print-string "GC returns ...")
+(@print gced-v)
              gced-v)
            ))))))
 
 (defun @apply (f args env)
-  (@print-string "@apply")
-  (@print f)
-  (@print args)
-  (@print env)
   ;; apply function f to a *list* of values (args) in given environment
   (cond
 
@@ -253,11 +245,14 @@
 
 
 ;;;; Garbage Collection
+;; if index is an atom, return index
+;; else index is a Cons, deep-copy it and return the new Cons
+;;  add offset to all Cdrs while deep-copying (offset makes the CDR point to the final location(s) of the copied cell(s))
 (defun @copy (index m offset)
   (if (< index m)
       (let ((car-copy (@copy (@car index) m offset))
             (cdr-copy (@copy (@cdr index) m offset)))
-        (@cons car-copy cdr-copy))
+        (+ offset (@cons car-copy cdr-copy)))
     index))
 
 ;;; function Gc(A, x) {
@@ -271,26 +266,19 @@
 ;;; function Gc(A, x) {
 ;;;   var C;
 ;;;   var B = cx;
-;;;   Copy(x, A, A - B)
+;;;   var x = Copy(x, A, A - B)
 ;;;   C = cx;
-;;;   x = C;
 ;;;   while (C < B) Set(--A, Get(--B));
-;;;   A;
-;;;   cx = x;
-;;;   return cx;
-;;; }
-
-;;; should the last 4 lines be?:
-;;;  cx = A;
-;;;  return cx;
+;;;   cx = A;
+;;;   return x;
 ;;; }
 (defun @gc (A index)
   (let ((B *mru-list-pointer*))
     (let ((copied-cell-index (@copy index A (- A B))))
-      (let ((C *mru-list-pointer*)) ;; updated by above line
+      (let ((C *mru-list-pointer*))  ;; *mru-list-pointer* is bumped(and offset) iff index is a list
         (let ((new-A (@move A B C)))
           (setf *mru-list-pointer* new-A)
-          *mru-list-pointer*)))))
+          copied-cell-index)))))
 
 (defun @move (A B C)
   ;; A is the previous stack (cell) pointer
@@ -300,12 +288,13 @@
   ;; stop when everything below C has been copied
   ;; basically: copy from B to A, bump A and B, until B has reached C
   ;; byte-by-byte copy
-  (loop
-   (when (>= C B) (return))
-   (decf A 1)
-   (decf B 1)
-   (let ((byte (@car B)))
-     (@put A byte)))
+  ;; A >= B >= C
+  (loop while (< C B)
+        do (progn
+             (decf A 1)
+             (decf B 1)
+             (let ((byte (@car B)))
+               (@put A byte))))
   A)
 
 ;;;;
@@ -430,7 +419,7 @@
 	(format *standard-output* "~%~%result ~a~%" result)
         (@print result)))))
 
-(defun main ()
+(defun main12 ()
   (initialize-memory)
   (let ((mem (make-instance 'atom-memory :bytes *memory*)))
     (let ((program (@read "A" mem)))
@@ -441,5 +430,23 @@
       (@print program))
     (let ((program (@read "(CONS (QUOTE E) (QUOTE F))" mem)))
       (let ((v (@eval program @NIL)))
+        (@print v)))
+    (let ((program (@read "((LAMBDA (X) X) (CONS (QUOTE G) (QUOTE H)))" mem)))
+      (let ((v (@eval program @NIL)))
+        (@print v)))
+    (let ((program (@read "((LAMBDA (X) (QUOTE A)) (CONS (QUOTE I) (QUOTE J)))" mem)))
+      (format *standard-output* "mru list pointer before eval ~a~%" *mru-list-pointer*)
+      (let ((v (@eval program @NIL)))
+      (format *standard-output* "mru list pointer after eval ~a~%" *mru-list-pointer*)
+        (@print v)))
+    ))
+
+(defun main ()
+  (initialize-memory)
+  (let ((mem (make-instance 'atom-memory :bytes *memory*)))
+    (let ((program (@read "((LAMBDA (X) (QUOTE A)) (CONS (QUOTE I) (QUOTE J)))" mem)))
+      (format *standard-output* "mru list pointer before eval ~a~%" *mru-list-pointer*)
+      (let ((v (@eval program @NIL)))
+      (format *standard-output* "mru list pointer after eval ~a~%" *mru-list-pointer*)
         (@print v)))
     ))
