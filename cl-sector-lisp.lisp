@@ -139,9 +139,6 @@
       ((@eq (@cdr e) kCond) (@evcon (@cdr e) env))
       (t 
        (let ((args (@evlis (@cdr e) env)))
-(format *standard-output* "args before @apply~%")
-         (@print args)
-(format *standard-output* "end args before @apply~%")
          (let ((v (@apply (@car e) args env)))
 	   (@gc previous-SP v)))))))
 
@@ -222,7 +219,6 @@
 (defun @evlis (expr-list env)
   ;; expr-list is a list of expressions which will form the args to a function
   ;; eval each arg, return a list of eval()ed args
-(format *standard-output* "EVLIS: ~s~%" expr-list)
   (cond
     ((@null? expr-list) @NIL)
     (t
