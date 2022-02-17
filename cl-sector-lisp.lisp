@@ -139,7 +139,9 @@
       ((@eq (@cdr e) kCond) (@evcon (@cdr e) env))
       (t 
        (let ((args (@evlis (@cdr e) env)))
+(format *standard-output* "args before @apply~%")
          (@print args)
+(format *standard-output* "end args before @apply~%")
          (let ((v (@apply (@car e) args env)))
 	   (@gc previous-SP v)))))))
 
@@ -187,15 +189,15 @@
        (@cdr first-arg)))
 
     (t
-     (let ((anonymous-function (@assoc f env))) ;; find the value of f
-       (@apply anonymous-function args env)))))
+     (let ((lookup-function (@assoc f env))) ;; find the value of f
+       (@apply lookup-function args env)))))
 
 
 (defun @pairlis (arg-names vals env)
   ;; pair up each arg-name with a value
   (cond
 
-    ((not (null arg-names))
+    ((not (@null? arg-names))
      (let ((first-name (@car arg-names))
 	   (first-value (@car vals))
 	   (rest-of-names (@cdr arg-names))
@@ -415,7 +417,7 @@
   (initialize-memory)
   ;; (Quote A)
   (let ((mem (make-instance 'atom-memory :bytes *memory*)))
-    (let ((program (@read "((LAMBDA (X) (QUOTE X)) (QUOTE A)))" mem)))
+    (let ((program (@read "( (LAMBDA (X) X) (QUOTE A) )" mem)))
 ;;    (let ((program (@read "((LAMBDA (X) (QUOTE X)) (CONS (QUOTE A) (QUOTE B)))" mem)))
       (let ((result (@eval program @NIL)))
 	(format *standard-output* "~a~%" result)
