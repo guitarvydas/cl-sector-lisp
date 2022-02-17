@@ -137,8 +137,11 @@
       ((@atom? e) (@assoc e env))
       ((@eq (@car e) kQuote) (@car (@cdr e)))
       ((@eq (@cdr e) kCond) (@evcon (@cdr e) env))
-      (t (let ((v (@apply (@car e) (@evlis (@cdr e) env) env)))
-	   (@gc previous-SP v))))))
+      (t 
+       (let ((args (@evlis (@cdr e) env)))
+         (@print args)
+         (let ((v (@apply (@car e) args env)))
+	   (@gc previous-SP v)))))))
 
 (defun @apply (f args env)
   (@print-string "@apply")
@@ -217,6 +220,7 @@
 (defun @evlis (expr-list env)
   ;; expr-list is a list of expressions which will form the args to a function
   ;; eval each arg, return a list of eval()ed args
+(format *standard-output* "EVLIS: ~s~%" expr-list)
   (cond
     ((@null? expr-list) @NIL)
     (t
@@ -398,11 +402,21 @@
                 (@print result)
                 (format *standard-output* "LSP=~a~%memory: ~a~%list: ~a~%~a~%" *mru-list-pointer* *memory* (list-cells) result)))))))))
 
-(defun main ()
+(defun main10 ()
   (initialize-memory)
   ;; (Quote A)
   (let ((mem (make-instance 'atom-memory :bytes *memory*)))
     (let ((program (@read "(QUOTE A)" mem)))
+      (let ((result (@eval program @NIL)))
+	(format *standard-output* "~a~%" result)
+        (@print result)))))
+  
+(defun main ()
+  (initialize-memory)
+  ;; (Quote A)
+  (let ((mem (make-instance 'atom-memory :bytes *memory*)))
+    (let ((program (@read "((LAMBDA (X) (QUOTE X)) (QUOTE A)))" mem)))
+;;    (let ((program (@read "((LAMBDA (X) (QUOTE X)) (CONS (QUOTE A) (QUOTE B)))" mem)))
       (let ((result (@eval program @NIL)))
 	(format *standard-output* "~a~%" result)
         (@print result)))))

@@ -13,7 +13,7 @@
         (let ((tail (@trim-leading-spaces remaining)))
           (cond
            ((null tail) (values result nil))
-           ((@is-follow-separator (@car tail)) (throw 'read-failure (format nil "too many right parentheses in %s" str)))
+           ((@is-follow-separator (car tail)) (throw 'read-failure (format nil "too many right parentheses in %s" str)))
            (t (values result tail))))))))
 
 (defun @listify-string(s)
