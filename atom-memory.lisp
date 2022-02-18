@@ -2,7 +2,7 @@
   ((bytes :initarg :bytes :accessor bytes)
    (current-atom-index :initform @NIL :accessor current-atom-index)))
 
-(defmethod reset ((self atom-memory))
+(defmethod mem-reset ((self atom-memory))
   (setf (current-atom-index self) @NIL))
 
 (defmethod ?eof ((self atom-memory))
@@ -15,11 +15,13 @@
 
 (defun getc (i)
   (let ((n (@get i)))
-    (if (eq 'character (type-of n))
+    (if (subtypep (type-of n) 'character)
         n
-      (if (eq 'fixnum (type-of n))
-          (code-char n)
-        (assert nil)))))
+      (if (subtypep (type-of n) 'fixnum )
+            (code-char n)
+	  (progn
+	    (format *error-output* "type-of n is ~a~%" (type-of n))
+            (assert nil))))))
       
 (defun sl-car (index)
   (char-code (getc index)))

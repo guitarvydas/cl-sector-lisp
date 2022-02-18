@@ -78,7 +78,7 @@
           (not-concluded)
           (setf buffer str)
           (setf atom-memory memory)
-          (reset atom-memory)
+          (mem-reset atom-memory)
           (send '(:self "init") t nil parts)
           (route-messages connections parts parts)
           (dispatch parts connections conclude-predicate)
